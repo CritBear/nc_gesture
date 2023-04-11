@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ..utils.functional import parameters_allocation_check
+from utils.functional import parameters_allocation_check
 
 
 class Decoder(nn.Module):
@@ -36,7 +36,7 @@ class Decoder(nn.Module):
 
         [batch_size, seq_len, _] = decoder_input.size()
 
-        decoder_input = F.dropout(decoder_input, drop_prob)
+        # decoder_input = F.dropout(decoder_input, drop_prob)
 
         z = torch.cat([z] * seq_len, 1).view(batch_size, seq_len, self.options.latent_variable_size)
         decoder_input = torch.cat([decoder_input, z], 2)

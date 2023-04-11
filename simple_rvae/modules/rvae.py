@@ -8,10 +8,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-from encoder import Encoder
-from decoder import Decoder
+from modules.encoder import Encoder
+from modules.decoder import Decoder
 
-from ..utils.functional import kld_coef, parameters_allocation_check, fold
+from utils.functional import kld_coef, parameters_allocation_check, fold
 
 
 class RVAE(nn.Module):
@@ -31,16 +31,6 @@ class RVAE(nn.Module):
                 encoder_input=None,
                 decoder_input=None,
                 z=None, initial_state=None):
-
-        assert parameters_allocation_check(self), \
-            'Invalid CUDA options. Parameters should be allocated in the same memory'
-        #use_cuda = self.embedding.word_embed.weight.is_cuda
-
-        # assert z is None and fold(lambda acc, parameter: acc and parameter is not None,
-        #                           [encoder_input, decoder_input],
-        #                           True) \
-        #        or (z is not None and decoder_input is not None), \
-        #     "Invalid input. If z is None then encoder and decoder inputs should be passed as arguments"
 
         if z is None:
             # Get context from encoder and sample z ~ N(mu, std)
@@ -62,6 +52,6 @@ class RVAE(nn.Module):
         else:
             kld = None
 
-        out, final_state = self.decoder(decoder_input, z, drop_prob, initial_state)
+        out, final_state = self.decoder(z, drop_prob, initial_state)
 
         return out, final_state, kld
