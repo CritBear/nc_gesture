@@ -1,9 +1,18 @@
 import os
+import sys
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from torch.utils.data import DataLoader
-from trainer import train
-from utils.tensors import collate
-import utils.fix_seed
 
+from modules.rvae import RVAE
+
+
+def train():
+
+
+
+
+
+if __name__ == "__main__":
+    train()
