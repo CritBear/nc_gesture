@@ -1,6 +1,7 @@
 import os
 import sys
 import torch
+import numpy as np
 
 from torch.utils.data import DataLoader
 
@@ -9,6 +10,10 @@ from modules.rvae import RVAE
 
 import pickle
 from tqdm import tqdm
+
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
+
 import bvh_parser
 
 
@@ -87,11 +92,126 @@ def train():
     torch.save(rvae.state_dict(), f"rvae_{'HJK_0412'}.pt")
 
 
+def extract_latent_from_data():
+    with open('rvae_HJK_0412_refined_motion_HJK.pkl', 'rb') as f:
+        latent_data = pickle.load(f)
+
+    print('Complete.')
+
+    tsne = TSNE(n_components=2).fit_transform(np.array(latent_data['latent_list']))
+    # print(tsne)
+
+    di_idx_list = []
+    de_idx_list = []
+    mi_idx_list = []
+    me_idx_list = []
+
+    for idx, style in enumerate(latent_data['style_list']):
+        if style == 'di':
+            di_idx_list.append(idx)
+        elif style == 'de':
+            de_idx_list.append(idx)
+        elif style == 'mi':
+            mi_idx_list.append(idx)
+        elif style == 'me':
+            me_idx_list.append(idx)
+
+    di_tsne = tsne[di_idx_list]
+    de_tsne = tsne[de_idx_list]
+    mi_tsne = tsne[mi_idx_list]
+    me_tsne = tsne[me_idx_list]
+
+    # print(di_tsne)
+    # print(de_tsne)
+    # print(mi_tsne)
+    # print(me_tsne)
+
+    plt.scatter(di_tsne[:, 0], di_tsne[:, 1], color='pink', label='di')
+    plt.scatter(de_tsne[:, 0], de_tsne[:, 1], color='purple', label='de')
+    plt.scatter(mi_tsne[:, 0], mi_tsne[:, 1], color='green', label='mi')
+    plt.scatter(me_tsne[:, 0], me_tsne[:, 1], color='blue', label='me')
+
+    plt.xlabel('tsne_0')
+    plt.ylabel('tsne_1')
+    plt.legend()
+    plt.show()
 
 
+def extract_latent_space():
+    options = TrainingOptions()
 
+    data_path = 'datasets/data/refined_motion_HJK.pkl'
 
+    print('Data loading...')
+
+    with open(data_path, 'rb') as f:
+        data = pickle.load(f)
+
+    dataset = NCMocapDataset(data)
+
+    dataloader = DataLoader(dataset, batch_size=options.batch_size, shuffle=True)
+
+    rvae = RVAE(options)
+    rvae.load_state_dict(torch.load(f"rvae_{'HJK_0412'}.pt"))
+    rvae.eval()
+
+    latent_data = {
+        'data_name': 'refined_motion_test_HJK.pkl',
+        'latent_size': options.latent_variable_size,
+        'style_list': [],
+        'latent_list': []
+    }
+
+    for idx, (style, motion) in enumerate(dataloader):
+        latent_data['style_list'].append(style[0])
+        latent_data['latent_list'].append(rvae.get_latent_space(motion).numpy().squeeze())
+        print(f'processing... [{idx + 1}/{len(dataloader)}]')
+
+    with open('rvae_HJK_0412_refined_motion_HJK.pkl', 'wb') as f:
+        pickle.dump(latent_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    print('Complete.')
+
+    tsne = TSNE(n_components=2, perplexity=2).fit_transform(np.array(latent_data['latent_list']))
+    # print(tsne)
+
+    di_idx_list = []
+    de_idx_list = []
+    mi_idx_list = []
+    me_idx_list = []
+
+    for idx, style in enumerate(latent_data['style_list']):
+        if style == 'di':
+            di_idx_list.append(idx)
+        elif style == 'de':
+            de_idx_list.append(idx)
+        elif style == 'mi':
+            mi_idx_list.append(idx)
+        elif style == 'me':
+            me_idx_list.append(idx)
+
+    di_tsne = tsne[di_idx_list]
+    de_tsne = tsne[de_idx_list]
+    mi_tsne = tsne[mi_idx_list]
+    me_tsne = tsne[me_idx_list]
+
+    # print(di_tsne)
+    # print(de_tsne)
+    # print(mi_tsne)
+    # print(me_tsne)
+
+    plt.scatter(di_tsne[:, 0], di_tsne[:, 1], color='pink', label='di')
+    plt.scatter(de_tsne[:, 0], de_tsne[:, 1], color='purple', label='de')
+    plt.scatter(mi_tsne[:, 0], mi_tsne[:, 1], color='green', label='mi')
+    plt.scatter(me_tsne[:, 0], me_tsne[:, 1], color='blue', label='me')
+
+    plt.xlabel('tsne_0')
+    plt.ylabel('tsne_1')
+    plt.legend()
+    plt.show()
 
 
 if __name__ == "__main__":
-    train()
+    # train()
+    # extract_latent_space()
+    extract_latent_from_data()

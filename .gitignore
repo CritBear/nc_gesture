@@ -119,6 +119,7 @@ fabric.properties
 *.bvh
 *.pkl
 *.npz
+*.pt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
