@@ -39,6 +39,7 @@ class TrainingOptions:
         self.batch_size = 1
         self.learning_rate = 0.0001
         self.drop_prob = 0.3
+        self.kld_weight = 1
 
 def train():
 

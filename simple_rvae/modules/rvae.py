@@ -80,7 +80,7 @@ class RVAE(nn.Module):
         return loss, recon_output, (recon_loss, kld_loss)
 
     def loss_function(self, recon, input, mu, logvar):
-        kld_weight = 0.05
+        kld_weight = self.options.kld_weight
         recon_loss = F.mse_loss(recon, input)
 
         kld_loss = torch.mean(
