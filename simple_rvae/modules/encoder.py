@@ -22,28 +22,17 @@ class Encoder(nn.Module):
                            hidden_size=self.options.encoder_rnn_size,
                            num_layers=self.options.encoder_num_layers,
                            batch_first=True,
-                           bidirectional=True)
+                           bidirectional=False)
 
     def forward(self, input):
         """
-        :param input: [batch_size, seq_len, embed_size] tensor
+        :param input: [batch_size, seq_len, input_size] tensor
         :return: [batch_size, latent_variable_size] tensor
         """
 
-        # [batch_size, seq_len, embed_size] = input.size()
+        _, (hidden_state, cell) = self.rnn(input)
 
-        # input = input.view(-1, embed_size)
-        # input = self.hw1(input)
-        # input = input.view(batch_size, seq_len, embed_size)
+        # hidden_state = torch.swapaxes(hidden_state, 0, 1)
+        # cell = torch.swapaxes(cell, 0, 1)
 
-        # assert parameters_allocation_check(self), \
-        #     'Invalid CUDA options. Parameters should be allocated in the same memory'
-
-        _, (_, final_state) = self.rnn(input)
-
-        final_state = final_state.view[-1]
-        final_state = final_state[-1]
-        h_1, h_2 = final_state[0], final_state[1]
-        final_state = torch.cat([h_1, h_2], 1)
-
-        return final_state
+        return (hidden_state, cell)

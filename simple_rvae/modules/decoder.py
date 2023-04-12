@@ -18,31 +18,22 @@ class Decoder(nn.Module):
         self.rnn = nn.LSTM(input_size=self.options.latent_variable_size,
                            hidden_size=self.options.decoder_rnn_size,
                            num_layers=self.options.decoder_num_layers,
-                           batch_first=True)
+                           batch_first=True,
+                           bidirectional=False)
 
         self.fc = nn.Linear(self.options.decoder_rnn_size, self.options.output_size)
 
-    def forward(self, decoder_input, z, drop_prob, initial_state=None):
+    def forward(self, z, hidden):
         """
-        :param decoder_input: [batch_size, seq_len, embed_size] tensor
-        :param z: [batch_size, latent_variable_size] tensor (sequence context)
-        :param drop_prob:
-        :param initial_state:
+        :param z: [batch_size, seq_len, latent_size] tensor
         :return:
         """
 
-        assert parameters_allocation_check(self), \
-            'Invalid CUDA options. Parameters should be allocated in the same memory'
+        # print('z')
+        # print(z.size())
+        # [batch_size, _] = z.size()
 
-        [batch_size, seq_len, _] = decoder_input.size()
+        output, (hidden, cell) = self.rnn(z, hidden)
+        result = self.fc(output)
 
-        # decoder_input = F.dropout(decoder_input, drop_prob)
-
-        z = torch.cat([z] * seq_len, 1).view(batch_size, seq_len, self.options.latent_variable_size)
-        decoder_input = torch.cat([decoder_input, z], 2)
-
-        rnn_out, final_state = self.rnn(decoder_input, initial_state)
-        result = self.fc(rnn_out)
-        result = result.view(batch_size, seq_len, self.options.output_size)
-
-        return result, final_state
+        return result, (hidden, cell)

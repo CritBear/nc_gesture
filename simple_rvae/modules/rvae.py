@@ -22,36 +22,58 @@ class RVAE(nn.Module):
 
         self.encoder = Encoder(self.options)
 
-        self.context_to_mu = nn.Linear(self.options.encoder_rnn_size * 2, self.options.latent_variable_size)
-        self.context_to_logvar = nn.Linear(self.options.encoder_rnn_size * 2, self.options.latent_variable_size)
+        self.context_to_mu = nn.Linear(
+            self.options.encoder_rnn_size * self.options.encoder_num_layers,
+            self.options.latent_variable_size
+        )
+        self.context_to_logvar = nn.Linear(
+            self.options.encoder_rnn_size * self.options.encoder_num_layers,
+            self.options.latent_variable_size
+        )
 
         self.decoder = Decoder(self.options)
 
-    def forward(self, drop_prob,
-                encoder_input=None,
-                decoder_input=None,
-                z=None, initial_state=None):
+    def forward(self, input, z=None, initial_state=None):
 
         if z is None:
-            # Get context from encoder and sample z ~ N(mu, std)
-            [batch_size, _] = encoder_input.size()
+            [batch_size, seq_len, feature_dim] = input.size()
 
-            context = self.encoder(encoder_input)
+            encoder_hidden = self.encoder(input)
 
-            mu = self.context_to_mu(context)
-            logvar = self.context_to_logvar(context)
+            encoder_h = encoder_hidden[0].view(batch_size, self.options.encoder_rnn_size * self.options.encoder_num_layers).to(self.options.device)
+
+            mu = self.context_to_mu(encoder_h)
+            logvar = self.context_to_logvar(encoder_h)
             std = torch.exp(0.5 * logvar)
+            eps = torch.randn_like(std).to(self.options.device)
 
-            z = Variable(torch.randn([batch_size, self.options.latent_variable_size]))
-            if self.options.use_cuda:
-                z = z.cuda()
+            z = mu + eps * std
 
-            z = z * std + mu
+            z = z.repeat(1, seq_len, 1)
+            z = z.view(batch_size, seq_len, self.options.latent_variable_size).to(self.options.device)
+            recon_output, hidden = self.decoder(z, encoder_hidden)
 
-            kld = (-0.5 * torch.sum(logvar - torch.pow(mu, 2) - torch.exp(logvar) + 1, 1)).mean().squeeze()
-        else:
-            kld = None
+            losses = self.loss_function(recon_output, input, mu, logvar)
+            loss, recon_loss, kld_loss = (
+                losses['loss'],
+                losses['recon_loss'],
+                losses['kld_loss']
+            )
 
-        out, final_state = self.decoder(z, drop_prob, initial_state)
+        return loss, recon_output, (recon_loss, kld_loss)
 
-        return out, final_state, kld
+    def loss_function(self, recon, input, mu, logvar):
+        kld_weight = 0.05
+        recon_loss = F.mse_loss(recon, input)
+
+        kld_loss = torch.mean(
+            -0.5 * torch.sum(1 + logvar - mu**2 - logvar.exp(), dim=1), dim=0
+        )
+
+        loss = recon_loss + kld_weight * kld_loss
+
+        return {
+            'loss': loss,
+            'recon_loss': recon_loss.detach(),
+            'kld_loss': -kld_loss.detach()
+        }

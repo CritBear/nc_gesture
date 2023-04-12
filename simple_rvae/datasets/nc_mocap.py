@@ -1,6 +1,9 @@
 import os
 import os.path
 import sys
+
+import torch
+
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 import numpy as np
@@ -25,8 +28,8 @@ class NCMocapDataset(Dataset):
         motion = self._data[idx]['joint_rotation_matrix'].reshape(
             self._data[idx]['joint_rotation_matrix'].shape[0],
             -1
-        )  # [frames x joints x 3 x 3] -> [frames x pose data]
-        return style, motion
+        ).astype(np.float32)  # [frames x joints x 3 x 3] -> [frames x pose data]
+        return style, torch.from_numpy(motion)
 
 
 # data_path = 'data/refined_motion_test_HJK.pkl'
