@@ -1,5 +1,3 @@
-import os
-import sys
 import torch
 import numpy as np
 
@@ -13,8 +11,6 @@ from tqdm import tqdm
 
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
-
-import bvh_parser
 
 
 class TrainingOptions:
