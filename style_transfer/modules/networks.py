@@ -1,10 +1,40 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from nc_gesture.style_transfer.modules.blocks import ConvBlock, ResBlock, LinearBlock, \
-    BottleNeckResBlock, Upsample, ConvLayers, ActiFirstResBlock, \
+from modules.blocks import ConvBlock, ResBlock, LinearBlock, \
+    BottleNeckResBlock, Upsample, ConvLayers, ActiFirstResBlock,\
     get_conv_pad, get_norm_layer
 
+class Generator(nn.Module):
+    def __init__(self, config):
+        super(Generator, self).__init__()
+        self.config = config
+        self.style_encoder = StyleEncoder(config)
+        self.content_encoder = ContentEncoder(config)
+        self.decoder = ContentDecoder(config)
+        self.mlp = MLP(config, get_num_adain_params(self.decoder))
+
+    def forward(self, content, style):
+        z_s = self.style_encoder(style)
+        z_c = self.content_encoder(content)
+        out = self.decode(z_c, z_s)
+        return out
+
+    def decode(self, content, model_code):
+        adain_params = self.mlp(model_code)
+        assign_adain_params(adain_params, self.decoder)
+        out = self.decoder(content)
+        return out
+
+    def get_lagent_codes(self,data):
+        codes ={}
+        codes["content_code"] = self.content_encoder(data["content"])
+        codes["style_code"] = self.style_encoder(data["style"])
+        return codes
+
+    def get_style_code(self, motion):
+        style_code = self.style_encoder(motion)
+        return style_code
 
 
 def assign_adain_params(adain_params, model):
@@ -92,7 +122,6 @@ class StyleEncoder(nn.Module):
             layers += ConvBlock(kernel_size, channels[i], channels[i + 1],
                                 stride=stride, norm='none', acti='lrelu')
 
-
         self.conv_model = nn.Sequential(*layers)
         self.channels = channels
 
@@ -118,7 +147,7 @@ class ContentDecoder(nn.Module):
         layers = []
         n_resblk = config.dec_resblks
         n_conv = config.dec_up_n
-        bt_channel = config.dec_bt_channel # #channels at the bottleneck
+        bt_channel = config.dec_bt_channel  #channels at the bottleneck
 
         layers += get_norm_layer('adain', channels[0]) # adain before everything
 

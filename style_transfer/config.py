@@ -11,7 +11,7 @@ class Config:
 
     # hyyyper params
     # data paths
-    data_dir = pjoin(BASEPATH, 'data')
+    data_dir = pjoin(BASEPATH, 'datasets\data')
     expr_dir = BASEPATH
     data_file_name = "motion_body_fixed_nohand_all.pkl"   # change to 'bfa.npz' for training on bfa data
 
@@ -30,7 +30,7 @@ class Config:
     mt_batch_n = 1  # number of batches to save in training
 
     # optimization options
-    num_epochs = 100              # maximum number of training iterations
+    num_epochs = 10              # maximum number of training iterations
     weight_decay = 0.0001          # weight decay
     lr_gen = 0.0001                # learning rate for the generator
     lr_dis = 0.0001                # learning rate for the discriminator
@@ -38,7 +38,7 @@ class Config:
     lr_policy = None
 
     # Training
-    batch_size = 32
+    batch_size = 32 # 128
 
     # Testing
     test_batch_n = 56  # number of test clips
@@ -54,11 +54,11 @@ class Config:
     }
 
     # input: T * 64
-    rot_channels = 100
-    pos3d_channels = 100
+    rot_channels = 100  # 128
+    pos3d_channels = 100  # 64
 
     num_channel = rot_channels
-    num_style_joints = 26
+    num_style_joints = 26  # 21
 
     style_channel_3d = pos3d_channels
 
@@ -68,8 +68,8 @@ class Config:
     followed by [enc_cl_global_pool]
 
     """
-    enc_cl_down_n = 2  # 64 -> 32 -> 16 -> 8 -> 4
-    enc_cl_channels = [0, 96, 144]
+    enc_cl_down_n = 2  # 100 -> 128 -> 160
+    enc_cl_channels = [0, 128, 160] # 64, 96, 144
     enc_cl_kernel_size = 8
     enc_cl_stride = 2
 
@@ -78,8 +78,8 @@ class Config:
     [down_n] stride=[enc_co_stride], dim=[enc_co_channels] convs (with IN)
     followed by [enc_co_resblks] resblks with IN
     """
-    enc_co_down_n = 1  # 64 -> 32 -> 16 -> 8
-    enc_co_channels = [num_channel, 144]
+    enc_co_down_n = 1  # 100 -> 160
+    enc_co_channels = [num_channel, 160]
     enc_co_kernel_size = 8
     enc_co_stride = 2
     enc_co_resblks = 1
@@ -98,11 +98,11 @@ class Config:
     [dec_up_n] Upsampling followed by stride=[dec_stride] convs
     """
 
-    dec_bt_channel = 144
+    dec_bt_channel = 144 # 144
     dec_resblks = enc_co_resblks
     dec_channels = enc_co_channels.copy()
     dec_channels.reverse()
-    dec_channels[-1] = 156  # Let it output rotations only
+    dec_channels[-1] = 100  # 156
     dec_up_n = enc_co_down_n
     dec_kernel_size = 8
     dec_stride = 1
@@ -127,17 +127,8 @@ class Config:
 
     num_classes = 8         # set to 16 for training on bfa data
 
-    gan_w = 1
-    rec_w = 1
-    rrec_w = 1
-    feat_w = 0.5
-    qt_w = 0.1
-    joint_w = 0.3
-    triplet_w = 0.3
-    triplet_margin = 5
-    twist_w = 1
-    twist_alpha = 100
-    trans_weight = 0.5
+    style_loss_weight = 0.5
+    content_loss_weight = 0.5
 
     device = None
     gpus = 1
