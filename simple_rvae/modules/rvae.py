@@ -50,12 +50,12 @@ class RVAE(nn.Module):
         z = mu + eps * std
         return z.detach()
 
-    def forward(self, input, z=None, initial_state=None):
+    def forward(self, x, z=None, initial_state=None):
 
         if z is None:
-            [batch_size, seq_len, feature_dim] = input.size()
+            [batch_size, seq_len, feature_dim] = x.size()
 
-            encoder_hidden = self.encoder(input)
+            encoder_hidden = self.encoder(x)
 
             encoder_h = encoder_hidden[0].view(batch_size, self.options.encoder_rnn_size * self.options.encoder_num_layers).to(self.options.device)
 
@@ -70,7 +70,7 @@ class RVAE(nn.Module):
             z = z.view(batch_size, seq_len, self.options.latent_variable_size).to(self.options.device)
             recon_output, hidden = self.decoder(z, encoder_hidden)
 
-            losses = self.loss_function(recon_output, input, mu, logvar)
+            losses = self.loss_function(recon_output, x, mu, logvar)
             loss, recon_loss, kld_loss = (
                 losses['loss'],
                 losses['recon_loss'],

@@ -178,6 +178,7 @@ class Viewer:
         frame_idx = 0
         n_frames = 0
         frame_time = 0
+        n_joints = 0
 
         if 'bvh' in path:
             with open(path) as f:
@@ -187,6 +188,7 @@ class Viewer:
 
             n_frames = bvh.n_frames
             frame_time = bvh.frame_time
+            n_joints = bvh.len(bvh.nodes)
             print(f'Frame length : {n_frames}')
 
         elif 'pkl' in path:
@@ -197,12 +199,14 @@ class Viewer:
 
             n_frames = pkl_data['n_frames']
             frame_time = pkl_data['frame_time']
+            n_joints = pkl_data['n_joints']
 
         else:
             raise ValueError("file format has to be 'bvh' or 'pkl'.")
 
         print(f'Frame length : {n_frames}')
         print(f'Frame time : {frame_time}')
+        print(f'Num of joints : {n_joints}')
 
         while True:
             time.sleep(frame_time)
@@ -217,7 +221,7 @@ def main():
     np.set_printoptions(precision=4, suppress=True)
 
     viewer = Viewer()
-    viewer.run_motion("../data/refined_motion_test_HJK.pkl")
+    viewer.run_motion("../data/motion_body_test_HJK.pkl")
     # viewer.run_motion("./motion_data/KTG/VAAI_Non_E_01_de_01.bvh")
 
     while True:

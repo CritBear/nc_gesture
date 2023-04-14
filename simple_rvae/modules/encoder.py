@@ -16,7 +16,7 @@ class Encoder(nn.Module):
 
         self.options = options
 
-        # self.hw1 = Highway(self.options.input_size, 2, F.relu)
+        self.hw1 = Highway(self.options.input_size, 2, F.relu)
 
         self.rnn = nn.LSTM(input_size=self.options.input_size,
                            hidden_size=self.options.encoder_rnn_size,
@@ -24,15 +24,21 @@ class Encoder(nn.Module):
                            batch_first=True,
                            bidirectional=False)
 
-    def forward(self, input):
+    def forward(self, x):
         """
-        :param input: [batch_size, seq_len, input_size] tensor
+        :param x: [batch_size, seq_len, input_size] tensor
         :return: [batch_size, latent_variable_size] tensor
         """
 
-        _, (hidden_state, cell) = self.rnn(input)
+        [batch_size, seq_len, input_size] = x.size()
+
+        x = x.view(-1, input_size)
+        x = self.hw1(x)
+        x = x.view(batch_size, seq_len, input_size)
+
+        _, (hidden_state, cell) = self.rnn(x)
 
         # hidden_state = torch.swapaxes(hidden_state, 0, 1)
         # cell = torch.swapaxes(cell, 0, 1)
 
-        return (hidden_state, cell)
+        return hidden_state, cell

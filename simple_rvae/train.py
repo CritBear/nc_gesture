@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from datasets.nc_mocap import NCMocapDataset
 from modules.rvae import RVAE
 
+import os
 import pickle
 from tqdm import tqdm
 
@@ -16,24 +17,31 @@ import matplotlib.pyplot as plt
 class TrainingOptions:
 
     def __init__(self):
+        self.data_dir_path = 'datasets/data'
+        self.model_dir_path = 'trained_model'
+
+        self.data_file_name = 'motion_body_HJK.pkl'
+
+        self.train_dataset_ratio = 0.8
+
         self.device = 'cpu'
         self.use_cuda = False
 
-        self.input_size = 666
+        self.input_size = 156
 
-        self.encoder_rnn_size = 2048
+        self.encoder_rnn_size = 1024
         self.encoder_num_layers = 2
 
-        self.latent_variable_size = 1024
+        self.latent_variable_size = 512
 
-        self.decoder_rnn_size = 2048
+        self.decoder_rnn_size = 1024
         self.decoder_num_layers = 2
 
-        self.output_size = 666
+        self.output_size = 156
 
-        self.num_epochs = 10
+        self.num_epochs = 50
         self.batch_size = 1
-        self.learning_rate = 0.0001
+        self.learning_rate = 0.00005
         self.drop_prob = 0.3
         self.kld_weight = 1
 
@@ -44,14 +52,18 @@ def train():
     options.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"INFO | Device : {options.device}")
 
-    data_path = 'datasets/data/refined_motion_HJK.pkl'
+    data_path = os.path.join(options.data_dir_path, options.data_file_name)
 
     with open(data_path, 'rb') as f:
         data = pickle.load(f)
 
     dataset = NCMocapDataset(data)
+    train_size = int(0.8 * len(dataset))
+    test_size = len(dataset) - train_size
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
 
-    dataloader = DataLoader(dataset, batch_size=options.batch_size, shuffle=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=options.batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=options.batch_size, shuffle=False)
 
     options.use_cuda = (True if options.device == 'cuda' else False)
 
@@ -60,16 +72,18 @@ def train():
     optimizer = torch.optim.Adam(rvae.parameters(), lr=options.learning_rate)
 
     recon_criterion = torch.nn.MSELoss()
+
     def criterion(input, recon, kld):
         recon_loss = recon_criterion(input, recon)
         return recon_loss + kld * 0.5
 
-    # train
     for epoch in range(options.num_epochs):
+
+        # train
         rvae.train()
         optimizer.zero_grad()
         train_iterator = tqdm(
-            enumerate(dataloader), total=len(dataloader), desc="training"
+            enumerate(train_dataloader), total=len(train_dataloader), desc="training"
         )
 
         for idx, (style, motion) in train_iterator:
@@ -86,7 +100,30 @@ def train():
             # print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(
             #     epoch + 1, options.num_epochs, idx + 1, len(dataloader), loss.item() / 1))
 
-    torch.save(rvae.state_dict(), f"rvae_{'HJK_0412'}.pt")
+        if (epoch + 1) % 5 == 0:
+            # test
+            rvae.eval()
+            eval_loss = 0
+            test_iterator = tqdm(enumerate(test_dataloader), total=len(test_dataloader), desc="testing")
+
+            with torch.no_grad():
+                for idx, (style, motion) in test_iterator:
+                    motion = motion.to(options.device)
+
+                    loss, recon_output, info = rvae(motion)
+
+                    eval_loss += loss.mean().item()
+
+                    test_iterator.set_postfix({"eval_loss": float(loss.mean())})
+
+            eval_loss = eval_loss / len(test_dataloader)
+            print("Evaluation Score : [{}]".format(eval_loss))
+
+        if (epoch + 1) % 10 == 0 or (epoch + 1) == options.num_epochs:
+            torch.save(rvae.state_dict(), f"rvae_{options.data_file_name}_epc{epoch + 1}.pt")
+            print(f'Trained model saved. EPOCH: {epoch + 1}')
+
+
 
 
 def extract_latent_from_data():
@@ -137,7 +174,7 @@ def extract_latent_from_data():
 def extract_latent_space():
     options = TrainingOptions()
 
-    data_path = 'datasets/data/refined_motion_HJK.pkl'
+    data_path = 'datasets/data/motion_body_test_HJK.pkl'
 
     print('Data loading...')
 
@@ -209,6 +246,6 @@ def extract_latent_space():
 
 
 if __name__ == "__main__":
-    # train()
+    train()
     # extract_latent_space()
-    extract_latent_from_data()
+    # extract_latent_from_data()
