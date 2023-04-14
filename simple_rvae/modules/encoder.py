@@ -2,12 +2,9 @@ import os.path
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-from modules.highway import Highway
-from utils.functional import parameters_allocation_check
+from nc_gesture.style_transfer.modules import blocks as B
 
 
 class Encoder(nn.Module):
@@ -36,3 +33,4 @@ class Encoder(nn.Module):
         # cell = torch.swapaxes(cell, 0, 1)
 
         return (hidden_state, cell)
+

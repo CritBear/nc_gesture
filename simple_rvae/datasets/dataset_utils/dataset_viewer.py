@@ -173,8 +173,7 @@ class Viewer:
         self.axis_y = arrow(pos=vector(0, 0, 0), axis=vector(0, 40, 0), shaftwidth=1, color=vpython.color.green)
         self.axis_z = arrow(pos=vector(0, 0, 0), axis=vector(0, 0, 40), shaftwidth=1, color=vpython.color.blue)
 
-    def run_motion(self, path, pkl_idx=0):
-
+    def run_motion(self, path, pkl_idx=5):
         frame_idx = 0
         n_frames = 0
         frame_time = 0
@@ -197,6 +196,8 @@ class Viewer:
 
             n_frames = pkl_data['n_frames']
             frame_time = pkl_data['frame_time']
+            file_name = pkl_data['file_name']
+            print(f'Frame file name :{file_name}')
 
         else:
             raise ValueError("file format has to be 'bvh' or 'pkl'.")
@@ -210,14 +211,19 @@ class Viewer:
 
             frame_idx += 1
             if frame_idx >= n_frames:
-                break
+                for obj in self.window.objects:
+                    obj.visible = False
+                    obj.delete()
+                return
 
 
 def main():
     np.set_printoptions(precision=4, suppress=True)
 
     viewer = Viewer()
-    viewer.run_motion("../data/refined_motion_test_HJK.pkl")
+    for i in range(130,200):
+       viewer.run_motion("../../decored_data_0414.pkl",pkl_idx=i)
+        #viewer.run_motion("../data/motion_body_fixed_HJKKTG.pkl",pkl_idx=i)
     # viewer.run_motion("./motion_data/KTG/VAAI_Non_E_01_de_01.bvh")
 
     while True:

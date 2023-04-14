@@ -12,6 +12,7 @@ from tqdm import tqdm
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
+import os
 
 class TrainingOptions:
 
@@ -19,21 +20,23 @@ class TrainingOptions:
         self.device = 'cpu'
         self.use_cuda = False
 
-        self.input_size = 666
+        self.input_size = 444
+
+        self.condition_size = 4
 
         self.encoder_rnn_size = 2048
         self.encoder_num_layers = 2
 
-        self.latent_variable_size = 1024
+        self.latent_variable_size = 512
 
         self.decoder_rnn_size = 2048
         self.decoder_num_layers = 2
 
-        self.output_size = 666
+        self.output_size = 444
 
-        self.num_epochs = 10
-        self.batch_size = 1
-        self.learning_rate = 0.0001
+        self.num_epochs = 128
+        self.batch_size = 20
+        self.learning_rate = 0.00005
         self.drop_prob = 0.3
         self.kld_weight = 1
 
@@ -44,7 +47,7 @@ def train():
     options.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"INFO | Device : {options.device}")
 
-    data_path = 'datasets/data/refined_motion_HJK.pkl'
+    data_path = 'datasets/data/motion_body_fixed_HJKKTG.pkl'
 
     with open(data_path, 'rb') as f:
         data = pickle.load(f)
@@ -86,7 +89,7 @@ def train():
             # print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(
             #     epoch + 1, options.num_epochs, idx + 1, len(dataloader), loss.item() / 1))
 
-    torch.save(rvae.state_dict(), f"rvae_{'HJK_0412'}.pt")
+    torch.save(rvae.state_dict(), f"rvae_{'_0414'}.pt")
 
 
 def extract_latent_from_data():
@@ -95,7 +98,7 @@ def extract_latent_from_data():
 
     print('Complete.')
 
-    tsne = TSNE(n_components=2).fit_transform(np.array(latent_data['latent_list']))
+    tsne = TSNE(n_components=2,perplexity=30).fit_transform(np.array(latent_data['latent_list']))
     # print(tsne)
 
     di_idx_list = []
@@ -134,10 +137,10 @@ def extract_latent_from_data():
     plt.show()
 
 
-def extract_latent_space():
+def extract_latent_space(dataset_name, model_name):
     options = TrainingOptions()
 
-    data_path = 'datasets/data/refined_motion_HJK.pkl'
+    data_path = 'datasets/data/' + dataset_name
 
     print('Data loading...')
 
@@ -149,20 +152,29 @@ def extract_latent_space():
     dataloader = DataLoader(dataset, batch_size=options.batch_size, shuffle=True)
 
     rvae = RVAE(options)
-    rvae.load_state_dict(torch.load(f"rvae_{'HJK_0412'}.pt"))
+    rvae.load_state_dict(torch.load(model_name))
     rvae.eval()
 
     latent_data = {
-        'data_name': 'refined_motion_test_HJK.pkl',
+        'data_name': dataset_name+'.pkl',
         'latent_size': options.latent_variable_size,
         'style_list': [],
         'latent_list': []
     }
-
-    for idx, (style, motion) in enumerate(dataloader):
-        latent_data['style_list'].append(style[0])
-        latent_data['latent_list'].append(rvae.get_latent_space(motion).numpy().squeeze())
-        print(f'processing... [{idx + 1}/{len(dataloader)}]')
+    with torch.no_grad():
+        for idx, (style, motion) in enumerate(dataloader):
+            out = rvae.get_latent_space(motion).numpy().squeeze()
+            for j,z in enumerate(out):
+                latent_data['style_list'].append(style[0])
+                latent_data['latent_list'].append(z)
+            try:
+                print(np.array(latent_data['latent_list']).shape)
+            except:
+                print(motion.shape)
+                for data in latent_data['latent_list']:
+                    print(np.array(data).shape)
+            print(latent_data['latent_list'])
+            print(f'processing... [{idx + 1}/{len(dataloader)}]')
 
     with open('rvae_HJK_0412_refined_motion_HJK.pkl', 'wb') as f:
         pickle.dump(latent_data, f, protocol=pickle.HIGHEST_PROTOCOL)
@@ -208,7 +220,85 @@ def extract_latent_space():
     plt.show()
 
 
+def make_result_data(dataset_name, model_name):
+    options = TrainingOptions()
+
+    data_path = 'datasets/data/' + dataset_name
+
+    print('Data loading...')
+
+    with open(data_path, 'rb') as f:
+        data = pickle.load(f)
+
+    dataset = NCMocapDataset(data)
+
+    dataloader = DataLoader(dataset, batch_size=options.batch_size, shuffle=False)
+
+    rvae = RVAE(options)
+    rvae.load_state_dict(torch.load(model_name))
+    rvae.eval()
+    decorded_data = []
+    with torch.no_grad():
+        for idx, (style, motion) in enumerate(dataloader):
+            out = rvae.forward(motion)[1]
+            for i,(s,m) in enumerate(zip(style,out)):
+                origin_data = data[idx*rvae.options.batch_size+i]
+                d = origin_data.copy()
+                d["joint_rotation_matrix"] = m.reshape(origin_data["n_frames"],74,3,2)
+                decorded_data.append(d)
+                #print(m)
+            print(f'processing... [{idx + 1}/{len(dataloader)}]')
+    with open("decored_data_0414.pkl", 'wb') as f:
+         pickle.dump(decorded_data, f)
+
+
+def split_data(data,origin_data, fixed_size):
+    n = 0
+    for d in origin_data:
+        if d["n_frames"] < 600: # 너무 긴 모션을 일단 버리고자 함.
+            n += 1
+            for i in range(d["n_frames"] // fixed_size):
+                dd = d.copy()
+                dd['n_frames'] = fixed_size
+                over_lap_num = (int(fixed_size * 1 / 4))
+                s = i * (fixed_size - over_lap_num)
+                e = s + fixed_size
+                dd['joint_rotation_matrix'] = d['joint_rotation_matrix'][s:e]
+                dd['root_position'] = d['root_position'][s: e]
+                #print(d["n_frames"], i, "size:", len(dd['joint_rotation_matrix']))
+                data.append(dd)
+    print("600 보다 작은 데이터 수 ",n)
+def make_short_data():
+    data_path1 = 'datasets/data/motion_body_HJK.pkl'
+    data_path2 = 'datasets/data/motion_body_KTG.pkl'
+
+    with open(data_path1, 'rb') as f:
+        data1 = pickle.load(f)
+
+    with open(data_path2, 'rb') as f:
+        data2 = pickle.load(f)
+
+    #print((data1[0]['joint_rotation_matrix'][0]))
+    data = []
+    fixed_size = 100
+    print("------------------data1 size:", len(data1))
+    split_data(data, data1,fixed_size)
+    print("------------------data size:",len(data))
+    print("------------------data2 size:", len(data2))
+    split_data(data, data2, fixed_size)
+    print("------------------data size:",len(data))
+    # for d in data2:
+    #     if d["n_frames"] < 600:
+    #         data.append(d)
+
+    with open(os.path.join("datasets/data/", 'motion_body_fixed_nohand_all.pkl'), 'wb') as f:
+         pickle.dump(data, f)
+
 if __name__ == "__main__":
-    # train()
-    # extract_latent_space()
-    extract_latent_from_data()
+    #make_short_data()
+    #train()
+    make_short_data()
+    #make_result_data("motion_body_fixed_HJKKTG.pkl","rvae__0414.pt")
+    #extract_latent_space("motion_body_fixed_HJKKTG.pkl","rvae__0414.pt")
+    #extract_latent_from_data()
+
