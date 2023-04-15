@@ -30,7 +30,7 @@ class Config:
     mt_batch_n = 1  # number of batches to save in training
 
     # optimization options
-    num_epochs = 100              # maximum number of training iterations
+    num_epochs = 200000              # maximum number of training iterations
     weight_decay = 0.0001          # weight decay
     lr_gen = 0.0001                # learning rate for the generator
     lr_dis = 0.0001                # learning rate for the discriminator
