@@ -11,7 +11,7 @@ class Config:
 
     # hyyyper params
     # data paths
-    data_dir = pjoin(BASEPATH, 'data')
+    data_dir = pjoin(BASEPATH, 'datasets/data/')
     expr_dir = BASEPATH
     data_file_name = "motion_body_fixed_nohand_all.pkl"   # change to 'bfa.npz' for training on bfa data
 
