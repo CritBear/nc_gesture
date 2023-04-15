@@ -24,7 +24,7 @@ class NCMocapDataset(Dataset):
         return len(self._data)
 
     def __getitem__(self, idx):
-        style = self._data[idx]['persona']
+        style = self._data[idx]['file_name']
         motion = self._data[idx]['joint_rotation_matrix'].reshape(
             self._data[idx]['joint_rotation_matrix'].shape[0],
             -1

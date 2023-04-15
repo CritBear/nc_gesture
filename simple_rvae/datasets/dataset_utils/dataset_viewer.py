@@ -221,9 +221,15 @@ class Viewer:
         else:
             raise ValueError("file format has to be 'bvh' or 'pkl'.")
 
-        print(f'Frame length : {n_frames}')
-        print(f'Frame time : {frame_time}')
-        print(f'Num of joints : {n_joints}')
+        if("target_style" in pkl_data):
+                target_style = pkl_data['target_style']
+                print(f'target style : {target_style}')
+
+        filename= pkl_data['file_name']
+        print(f'file name:{filename}')
+        #print(f'Frame length : {n_frames}')
+        #print(f'Frame time : {frame_time}')
+        #print(f'Num of joints : {n_joints}')
 
         if self.max_frame_length < n_frames:
             self.max_frame_length = n_frames
@@ -238,11 +244,14 @@ class Viewer:
             if self.frame_times[i] != self.frame_times[i + 1]:
                 print("Warning: Frame times are not same.")
 
-        for frame_idx in range(self.max_frame_length):
+        frame_idx = 0
+        while(True):
             for model_idx in range(len(self.models)):
-
                 if self.n_frames[model_idx] > frame_idx:
                     self.models[model_idx].update(frame_idx)
+                    frame_idx += 1
+                else:
+                    frame_idx = 0
 
             time.sleep(self.frame_times[0])
 
@@ -251,9 +260,14 @@ def main():
     np.set_printoptions(precision=4, suppress=True)
 
     viewer = Viewer()
+    i = 8
+    # with open("../../../style_transfer/decord_result_BaseMST_motion_body_fixed_nohand_all.pkl_59340.pt.pkl", 'rb') as f:
+    #     file = pickle.load(f)
+    # for idx, data in enumerate(file):
+    #     print(idx, data['target_style'],data['file_name'])
 
-    viewer.init_model("../data/motion_body_test_HJK.pkl", pkl_idx=1, model_offset=vector(-40, 0, 0))
-    viewer.init_model("../data/motion_body_test_KTG.pkl", pkl_idx=1, model_offset=vector(40, 0, 0))
+    viewer.init_model("../../../style_transfer/datasets/data/motion_body_fixed_nohand_all.pkl", pkl_idx=i, model_offset=vector(-40, 0, 0))
+    viewer.init_model("../../../style_transfer/decord_result_BaseMST_motion_body_fixed_nohand_all.pkl_2000.pt.pkl", pkl_idx=i, model_offset=vector(40, 0, 0))
 
     viewer.run_motion()
 
