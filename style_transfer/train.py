@@ -1,6 +1,5 @@
 
 import torch
-import numpy as np
 
 from torch.utils.data import DataLoader
 
@@ -65,10 +64,10 @@ def train():
 
             with torch.no_grad():
                 output_motion_style_code = model.get_style_code(output_motion)
-                style_motion_style_code = model.get_style_code(output_motion)
+                style_motion_style_code = model.get_style_code(style_motion)
 
             style_loss = MSELoss(output_motion_style_code, style_motion_style_code)
-            content_loss = MSELoss(output_motion, content_motion) # reconstruction loss
+            content_loss = MSELoss(output_motion, content_motion)  # reconstruction loss
 
             loss = options.style_loss_weight * style_loss + options.content_loss_weight*content_loss
 
@@ -78,11 +77,13 @@ def train():
 
             train_content_iterator.set_postfix({"train_loss": float(loss.mean())})
 
-        print(f'Epoch {epoch + 1}/{options.num_epochs}')
+        print(f'\nEpoch {epoch + 1}/{options.num_epochs}')
         loss_history.append(loss.item())
 
-        if epoch % 10 == 0:
-            torch.save(model.state_dict(), f"BaseMST_{options.data_file_name}_{epoch}.pt")
+        if epoch % 1000 == 0:
+            torch.save(model.state_dict(), f"Results\BaseMST_{options.data_file_name}_{epoch}.pt")
+
+    torch.save(model.state_dict(), f"Results\BaseMST_{options.data_file_name}_last.pt")
 
     plt.plot(loss_history)
     plt.xlabel('epoch')

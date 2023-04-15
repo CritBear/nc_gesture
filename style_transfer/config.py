@@ -30,7 +30,7 @@ class Config:
     mt_batch_n = 1  # number of batches to save in training
 
     # optimization options
-    num_epochs = 10              # maximum number of training iterations
+    num_epochs = 10000              # maximum number of training iterations
     weight_decay = 0.0001          # weight decay
     lr_gen = 0.0001                # learning rate for the generator
     lr_dis = 0.0001                # learning rate for the discriminator
@@ -38,7 +38,7 @@ class Config:
     lr_policy = None
 
     # Training
-    batch_size = 32 # 128
+    batch_size = 128  # 128
 
     # Testing
     test_batch_n = 56  # number of test clips
@@ -54,11 +54,11 @@ class Config:
     }
 
     # input: T * 64
-    rot_channels = 100  # 128
-    pos3d_channels = 100  # 64
+    rot_channels = 100  # content input frame num
+    pos3d_channels = 100  # style input frame num
 
     num_channel = rot_channels
-    num_style_joints = 26  # 21
+    num_style_joints = 26  # input joint
 
     style_channel_3d = pos3d_channels
 
@@ -119,7 +119,7 @@ class Config:
 
     """
     disc_channels = [pos3d_channels, 96, 144]
-    disc_down_n = 2  # 64 -> 32 -> 16 -> 8 -> 4
+    disc_down_n = 2  # 100 -> 96 -> 144
     disc_kernel_size = 6
     disc_stride = 1
     disc_pool_size = 3
@@ -127,8 +127,8 @@ class Config:
 
     num_classes = 8         # set to 16 for training on bfa data
 
-    style_loss_weight = 0.5
-    content_loss_weight = 0.5
+    style_loss_weight = 0.7
+    content_loss_weight = 0.3
 
     device = None
     gpus = 1
