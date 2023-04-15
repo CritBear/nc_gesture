@@ -2,9 +2,12 @@ import os.path
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
-from nc_gesture.style_transfer.modules import blocks as B
+from modules.highway import Highway
+from utils.functional import parameters_allocation_check
 
 
 class Encoder(nn.Module):
@@ -13,7 +16,7 @@ class Encoder(nn.Module):
 
         self.options = options
 
-        # self.hw1 = Highway(self.options.input_size, 2, F.relu)
+        self.hw1 = Highway(self.options.input_size, 2, F.relu)
 
         self.rnn = nn.LSTM(input_size=self.options.input_size,
                            hidden_size=self.options.encoder_rnn_size,
@@ -21,16 +24,21 @@ class Encoder(nn.Module):
                            batch_first=True,
                            bidirectional=False)
 
-    def forward(self, input):
+    def forward(self, x):
         """
-        :param input: [batch_size, seq_len, input_size] tensor
+        :param x: [batch_size, seq_len, input_size] tensor
         :return: [batch_size, latent_variable_size] tensor
         """
 
-        _, (hidden_state, cell) = self.rnn(input)
+        [batch_size, seq_len, input_size] = x.size()
+
+        x = x.view(-1, input_size)
+        x = self.hw1(x)
+        x = x.view(batch_size, seq_len, input_size)
+
+        _, (hidden_state, cell) = self.rnn(x)
 
         # hidden_state = torch.swapaxes(hidden_state, 0, 1)
         # cell = torch.swapaxes(cell, 0, 1)
 
-        return (hidden_state, cell)
-
+        return hidden_state, cell

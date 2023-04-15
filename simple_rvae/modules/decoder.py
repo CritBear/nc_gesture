@@ -37,4 +37,3 @@ class Decoder(nn.Module):
         result = self.fc(output)
 
         return result, (hidden, cell)
-
