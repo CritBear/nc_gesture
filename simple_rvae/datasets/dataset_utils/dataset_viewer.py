@@ -10,10 +10,11 @@ from bvh_parser import Bvh
 
 
 class BodyModel:
-    def __init__(self, data):
+    def __init__(self, data, model_offset):
         self.data = data
         self.bones = []
         self.joints = []
+        self.model_offset = model_offset
 
         self.init_model()
 
@@ -40,8 +41,8 @@ class BodyModel:
 
 class PklModel(BodyModel):
 
-    def __init__(self, data):
-        super().__init__(data)
+    def __init__(self, data, model_offset=vector(0, 0, 0)):
+        super().__init__(data, model_offset)
 
     def init_model(self):
         for joint_idx in range(self.data['n_joints']):
@@ -83,7 +84,7 @@ class PklModel(BodyModel):
             self.joints[joint_idx].global_transform = \
                 self.joints[self.joints[joint_idx].parent_idx].global_transform @ self.joints[joint_idx].local_transform
 
-        self.joints[joint_idx].update_obj()
+        self.joints[joint_idx].update_obj(self.model_offset)
 
         for child_idx in data['children_indices'][joint_idx]:
             self.update_joint(frame_idx, child_idx)
@@ -91,8 +92,8 @@ class PklModel(BodyModel):
 
 class BvhModel(BodyModel):
 
-    def __init__(self, data):
-        super().__init__(data)
+    def __init__(self, data, model_offset=vector(0, 0, 0)):
+        super().__init__(data, model_offset)
 
         self.joints_parent_idx = None
         self.joints_children_idx = None
@@ -110,7 +111,7 @@ class BvhModel(BodyModel):
         if joint_idx == 0:  # Root
             self.joints[joint_idx].update_local_transform(
                 rotation=bvh.nodes[joint_idx].rotation[frame_idx],
-                position=bvh.nodes[joint_idx].position[frame_idx]
+                # position=bvh.nodes[joint_idx].position[frame_idx]
             )
             self.joints[joint_idx].global_transform = self.joints[joint_idx].local_transform
         else:
@@ -147,8 +148,8 @@ class Joint:
         ])
         self.global_transform = np.zeros((4, 4))
 
-    def update_obj(self):
-        self.obj.pos = vector(*self.global_transform[:3, 3])
+    def update_obj(self, model_offset):
+        self.obj.pos = vector(*self.global_transform[:3, 3]) + model_offset
 
     def update_local_transform(self, rotation, position=None):
         if position is not None:
@@ -173,9 +174,12 @@ class Viewer:
         self.axis_y = arrow(pos=vector(0, 0, 0), axis=vector(0, 40, 0), shaftwidth=1, color=vpython.color.green)
         self.axis_z = arrow(pos=vector(0, 0, 0), axis=vector(0, 0, 40), shaftwidth=1, color=vpython.color.blue)
 
-    def run_motion(self, path, pkl_idx=0):
+        self.max_frame_length = 0
+        self.models = []
+        self.n_frames = []
+        self.frame_times = []
 
-        frame_idx = 0
+    def init_model(self, path, pkl_idx=0, model_offset=vector(0, 0, 0), inference_path=None):
         n_frames = 0
         frame_time = 0
         n_joints = 0
@@ -184,7 +188,7 @@ class Viewer:
             with open(path) as f:
                 bvh = Bvh(f.read())
 
-            model = BvhModel(bvh)
+            model = BvhModel(bvh, model_offset)
 
             n_frames = bvh.n_frames
             frame_time = bvh.frame_time
@@ -195,7 +199,20 @@ class Viewer:
             with open(path, 'rb') as f:
                 pkl_data = pickle.load(f)[pkl_idx]
 
-            model = PklModel(pkl_data)
+            if inference_path is not None:
+                with open(inference_path, 'rb') as f:
+                    inference_data = pickle.load(f)
+                    recon_motion = inference_data['recon_motion'][pkl_idx]
+
+                    pkl_data['joint_rotation_matrix'] = recon_motion.reshape(
+                        recon_motion.shape[0],
+                        -1,
+                        3,
+                        2
+                    )
+                    print(pkl_data['joint_rotation_matrix'].shape)
+
+            model = PklModel(pkl_data, model_offset)
 
             n_frames = pkl_data['n_frames']
             frame_time = pkl_data['frame_time']
@@ -208,20 +225,38 @@ class Viewer:
         print(f'Frame time : {frame_time}')
         print(f'Num of joints : {n_joints}')
 
-        while True:
-            time.sleep(frame_time)
-            model.update(frame_idx)
+        if self.max_frame_length < n_frames:
+            self.max_frame_length = n_frames
 
-            frame_idx += 1
-            if frame_idx >= n_frames:
-                break
+        self.models.append(model)
+        self.n_frames.append(n_frames)
+        self.frame_times.append(frame_time)
+
+    def run_motion(self):
+
+        for i in range(len(self.frame_times) - 1):
+            if self.frame_times[i] != self.frame_times[i + 1]:
+                print("Warning: Frame times are not same.")
+
+        for frame_idx in range(self.max_frame_length):
+            for model_idx in range(len(self.models)):
+
+                if self.n_frames[model_idx] > frame_idx:
+                    self.models[model_idx].update(frame_idx)
+
+            time.sleep(self.frame_times[0])
 
 
 def main():
     np.set_printoptions(precision=4, suppress=True)
 
     viewer = Viewer()
-    viewer.run_motion("../data/motion_body_test_HJK.pkl")
+
+    viewer.init_model("../data/motion_body_test_HJK.pkl", pkl_idx=1, model_offset=vector(-40, 0, 0))
+    viewer.init_model("../data/motion_body_test_KTG.pkl", pkl_idx=1, model_offset=vector(40, 0, 0))
+
+    viewer.run_motion()
+
     # viewer.run_motion("./motion_data/KTG/VAAI_Non_E_01_de_01.bvh")
 
     while True:

@@ -33,6 +33,30 @@ class RVAE(nn.Module):
 
         self.decoder = Decoder(self.options)
 
+    def get_latent_and_sample(self, input):
+        [batch_size, seq_len, feature_dim] = input.size()
+
+        encoder_hidden = self.encoder(input)
+
+        encoder_h = encoder_hidden[0].view(batch_size,
+                                           self.options.encoder_rnn_size * self.options.encoder_num_layers).to(
+            self.options.device)
+
+        mu = self.context_to_mu(encoder_h)
+        logvar = self.context_to_logvar(encoder_h)
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std).to(self.options.device)
+
+        z = mu + eps * std
+
+        z_out = z.detach()
+
+        z = z.repeat(1, seq_len, 1)
+        z = z.view(batch_size, seq_len, self.options.latent_variable_size).to(self.options.device)
+        recon_output, hidden = self.decoder(z, encoder_hidden)
+
+        return z_out, recon_output.detach()
+
     def get_latent_space(self, input):
         [batch_size, seq_len, feature_dim] = input.size()
 

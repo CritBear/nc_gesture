@@ -39,7 +39,7 @@ class TrainingOptions:
 
         self.output_size = 156
 
-        self.num_epochs = 50
+        self.num_epochs = 100
         self.batch_size = 1
         self.learning_rate = 0.00005
         self.drop_prob = 0.3
@@ -120,7 +120,8 @@ def train():
             print("Evaluation Score : [{}]".format(eval_loss))
 
         if (epoch + 1) % 10 == 0 or (epoch + 1) == options.num_epochs:
-            torch.save(rvae.state_dict(), f"rvae_{options.data_file_name}_epc{epoch + 1}.pt")
+            model_name = f"rvae_{options.data_file_name}_lr0005_epc{epoch + 1}.pt"
+            torch.save(rvae.state_dict(), os.path.join(options.model_dir_path, model_name))
             print(f'Trained model saved. EPOCH: {epoch + 1}')
 
 
@@ -171,6 +172,86 @@ def extract_latent_from_data():
     plt.show()
 
 
+def extract_latent_and_sample():
+
+    options = TrainingOptions()
+
+    options.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"INFO | Device : {options.device}")
+    options.use_cuda = (True if options.device == 'cuda' else False)
+
+    data_path = os.path.join(options.data_dir_path, options.data_file_name)
+
+    print('Data loading...')
+
+    with open(data_path, 'rb') as f:
+        data = pickle.load(f)
+
+    dataset = NCMocapDataset(data)
+    dataloader = DataLoader(dataset, batch_size=options.batch_size, shuffle=True)
+
+    rvae = RVAE(options).to(options.device)
+    rvae.load_state_dict(torch.load('trained_model/rvae_motion_body_HJK.pkl_lr0005_epc100.pt'))
+    rvae.eval()
+
+    inference_data = {
+        'data_name': options.data_file_name,
+        'latent_size': options.latent_variable_size,
+        'style_list': [],
+        'latent_list': [],
+        'recon_motion': []
+    }
+
+    for idx, (style, motion) in enumerate(dataloader):
+        motion = motion.to(options.device)
+        inference_data['style_list'].append(style[0])
+        z, recon_motion = rvae.get_latent_and_sample(motion)
+        z = z.cpu().numpy().squeeze()
+        recon_motion = recon_motion.cpu().numpy().squeeze()
+
+        inference_data['latent_list'].append(z)
+        inference_data['recon_motion'].append(recon_motion)
+
+        print(f'\rprocessing... [{idx + 1}/{len(dataloader)}]', end='')
+
+    with open('inference_rvae_motion_body_HJK.pkl_lr0005_epc100', 'wb') as f:
+        pickle.dump(inference_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    print('Complete.')
+
+    tsne = TSNE(n_components=2, perplexity=50).fit_transform(np.array(inference_data['latent_list']))
+
+    di_idx_list = []
+    de_idx_list = []
+    mi_idx_list = []
+    me_idx_list = []
+
+    for idx, style in enumerate(inference_data['style_list']):
+        if style == 'di':
+            di_idx_list.append(idx)
+        elif style == 'de':
+            de_idx_list.append(idx)
+        elif style == 'mi':
+            mi_idx_list.append(idx)
+        elif style == 'me':
+            me_idx_list.append(idx)
+
+    di_tsne = tsne[di_idx_list]
+    de_tsne = tsne[de_idx_list]
+    mi_tsne = tsne[mi_idx_list]
+    me_tsne = tsne[me_idx_list]
+
+    plt.scatter(di_tsne[:, 0], di_tsne[:, 1], color='pink', label='di')
+    plt.scatter(de_tsne[:, 0], de_tsne[:, 1], color='purple', label='de')
+    plt.scatter(mi_tsne[:, 0], mi_tsne[:, 1], color='green', label='mi')
+    plt.scatter(me_tsne[:, 0], me_tsne[:, 1], color='blue', label='me')
+
+    plt.xlabel('tsne_0')
+    plt.ylabel('tsne_1')
+    plt.legend()
+    plt.show()
+
+
 def extract_latent_space():
     options = TrainingOptions()
 
@@ -206,7 +287,7 @@ def extract_latent_space():
 
     print('Complete.')
 
-    tsne = TSNE(n_components=2, perplexity=2).fit_transform(np.array(latent_data['latent_list']))
+    tsne = TSNE(n_components=2, perplexity=50).fit_transform(np.array(latent_data['latent_list']))
     # print(tsne)
 
     di_idx_list = []
@@ -246,6 +327,7 @@ def extract_latent_space():
 
 
 if __name__ == "__main__":
-    train()
+    # train()
+    extract_latent_and_sample()
     # extract_latent_space()
     # extract_latent_from_data()
