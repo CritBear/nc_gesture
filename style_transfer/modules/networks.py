@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+from torch import autograd
+import numpy as np
 import torch.nn.functional as F
 from nc_gesture.style_transfer.modules.blocks import ConvBlock, ResBlock, LinearBlock, \
     BottleNeckResBlock, Upsample, ConvLayers, ActiFirstResBlock, \
@@ -13,6 +15,7 @@ class Generator(nn.Module):
         self.content_encoder = ContentEncoder(config)
         self.decoder = ContentDecoder(config)
         self.mlp = MLP(config, get_num_adain_params(self.decoder))
+        self.disc = Discriminator(config)
 
     def forward(self, content, style):
         z_s = self.style_encoder(style)
@@ -169,3 +172,88 @@ class ContentDecoder(nn.Module):
     def forward(self, x):
         x = self.model(x)
         return x
+
+
+class Discriminator(nn.Module):
+    def __init__(self,config):
+        super(Discriminator, self).__init__()
+
+        channels = config.disc_channels
+        down_n = config.disc_down_n
+        ks = config.disc_kernel_size
+        stride = config.disc_stride
+        pool_ks = config.disc_pool_size
+        pool_stride = config.disc_pool_stride
+        out_dim = config.num_classes
+
+        assert down_n + 1 == len(channels)
+
+        cnn_f = ConvLayers(kernel_size=ks, in_channels=channels[0], out_channels=channels[0])
+
+        for i in range(down_n):
+            cnn_f += [ActiFirstResBlock(kernel_size=ks, in_channels=channels[i], out_channels=channels[i], stride=stride, acti='lrelu', norm='none')]
+            cnn_f += [ActiFirstResBlock(kernel_size=ks, in_channels=channels[i], out_channels=channels[i + 1], stride=stride, acti='lrelu', norm='none')]
+            cnn_f += [get_conv_pad(pool_ks, pool_stride)]
+            cnn_f += [nn.AvgPool1d(kernel_size=pool_ks, stride=pool_stride)]
+
+        cnn_f += [ActiFirstResBlock(kernel_size=ks, in_channels=channels[-1], out_channels=channels[-1], stride=stride, acti='lrelu', norm='none')]
+        cnn_f += [ActiFirstResBlock(kernel_size=ks, in_channels=channels[-1], out_channels=channels[-1], stride=stride, acti='lrelu', norm='none')]
+
+        cnn_c = ConvBlock(kernel_size=ks, in_channels=channels[-1], out_channels = out_dim,
+                          stride=1, norm='none', acti='lrelu', acti_first=True)
+
+        self.cnn_f = nn.Sequential(*cnn_f)
+        self.cnn_c = nn.Sequential(*cnn_c)
+        self.device = config.device
+    def forward(self,x,y):
+        assert(x.size(0) == y.size(0))
+        feat = self.cnn_f(x) # 마지막 레이어 전
+        out = self.cnn_c(feat)
+        index = torch.LongTensor(range(out.size(0))).to(self.device)
+        out = out[index,y, :] # y번째 요소 값만 가져옴.
+        return out, feat
+
+    '''
+    fake input에 대한 loss 계산.
+    '''
+    def calc_dis_fake_loss(self, input_fake, input_label):
+        resp_fake, gan_feat = self.forward(input_fake, input_label)
+        total_count = torch.tensor(np.prod(resp_fake.size()),
+                                   dtype=torch.float).to(self.device)  # 가짜라 판별한 갯수를 계산.
+        fake_loss = torch.nn.ReLU()(1.0 + resp_fake).mean()
+        correct_count = (resp_fake < 0).sum()
+        fake_accuracy = correct_count.type_as(fake_loss) / total_count
+        return fake_loss, fake_accuracy, resp_fake
+
+    '''
+    real input에 대한 loss 계산.
+    '''
+    def calc_dis_real_loss(self, input_real, input_label):
+        resp_real, gan_feat = self.forward(input_real, input_label)
+        total_count = torch.tensor(np.prod(resp_real.size()),
+                                   dtype=torch.float).to(self.device)
+        real_loss = torch.nn.ReLU()(1.0 - resp_real).mean()
+        correct_count = (resp_real >= 0).sum()
+        real_accuracy = correct_count.type_as(real_loss) / total_count
+        return real_loss, real_accuracy, resp_real
+
+    def calc_gen_loss(self, input_fake, input_fake_label):
+        resp_fake, gan_feat = self.forward(input_fake, input_fake_label)
+        total_count = torch.tensor(np.prod(resp_fake.size()),#prod array 내부 요소들의 곱.prod([128,128,39]) = 128 * 128 * 39
+                                   dtype=torch.float).to(self.device)
+        loss = -resp_fake.mean()
+        correct_count = (resp_fake >= 0).sum()
+        accuracy = correct_count.type_as(loss) / total_count
+        return loss, accuracy, gan_feat
+
+    def calc_grad2(self, d_out, x_in):
+        batch_size = x_in.size(0)
+        grad_dout = autograd.grad(outputs=d_out.mean(),
+                                  inputs=x_in,
+                                  create_graph=True,
+                                  retain_graph=True,
+                                  only_inputs=True)[0]
+        grad_dout2 = grad_dout.pow(2)
+        assert (grad_dout2.size() == x_in.size())
+        reg = grad_dout2.sum()/batch_size
+        return reg

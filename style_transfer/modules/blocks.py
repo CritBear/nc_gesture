@@ -124,7 +124,6 @@ def ConvBlock(kernel_size, in_channels, out_channels, stride=1, pad_type='reflec
     """
     returns a list of [pad, conv, norm, acti] or [acti, pad, conv, norm]
     """
-
     layers = ConvLayers(kernel_size, in_channels, out_channels, stride=stride, pad_type=pad_type, use_bias=use_bias)
     layers += get_dropout_layer(dropout)
     layers += get_norm_layer(norm, norm_dim=out_channels)

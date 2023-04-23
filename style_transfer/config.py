@@ -13,7 +13,7 @@ class Config:
     # data paths
     data_dir = pjoin(BASEPATH, 'datasets\data')
     expr_dir = BASEPATH
-    data_file_name = "motion_body_fixed_nohand_all.pkl"   # change to 'bfa.npz' for training on bfa data
+    data_file_name = "style_nohand_fixed_all.pkl"   # change to 'bfa.npz' for training on bfa data
 
     # model paths
     main_dir = None
@@ -30,16 +30,16 @@ class Config:
     mt_batch_n = 1  # number of batches to save in training
 
     # optimization options
-    num_epochs = 1000              # maximum number of training iterations
+    num_epochs = 100000              # maximum number of training iterations
     weight_decay = 0.0001          # weight decay
     lr_gen = 0.0001                # learning rate for the generator
     lr_dis = 0.0001                # learning rate for the discriminator
     weight_init = 'kaiming'                 # initialization [gaussian/kaiming/xavier/orthogonal]
     lr_policy = None
 
-    triplet_margin = 5
+    triplet_margin = 1
     # Training
-    batch_size = 56 # 128
+    batch_size = 128 # 128
 
     # Testing
     test_batch_n = 56  # number of test clips
@@ -126,11 +126,15 @@ class Config:
     disc_pool_size = 3
     disc_pool_stride = 2
 
-    num_classes = 8         # set to 16 for training on bfa data
+    num_classes = 4         # set to 16 for training on bfa data
 
-    style_loss_weight = 0.3
-    content_loss_weight = 0.5
-    triplet_loss_weight = 0.2
+    trans_weight = 0.5
+
+    style_loss_weight = 1
+    content_loss_weight = 1
+    triplet_loss_weight = 0.1
+    adv_loss_weight = 1
+    ft_loss_weight = 0.5
 
     device = None
     gpus = 1
