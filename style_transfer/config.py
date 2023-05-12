@@ -13,7 +13,7 @@ class Config:
     # data paths
     data_dir = pjoin(BASEPATH, 'datasets\data')
     expr_dir = BASEPATH
-    data_file_name = "style_nohand_fixed_all.pkl"   # change to 'bfa.npz' for training on bfa data
+    data_file_name = "action_style_KTG.pkl"
 
     # model paths
     main_dir = None
@@ -39,7 +39,7 @@ class Config:
 
     triplet_margin = 1
     # Training
-    batch_size = 128 # 128
+    batch_size = 3 # 128
 
     # Testing
     test_batch_n = 56  # number of test clips
@@ -55,11 +55,13 @@ class Config:
     }
 
     # input: T * 64
+    num_feats = 6
+
     rot_channels = 100  # 128
     pos3d_channels = 100  # 64
 
     num_channel = rot_channels
-    num_style_joints = 26  # 21
+    num_joints = 26  # 21
 
     style_channel_3d = pos3d_channels
 
@@ -126,7 +128,8 @@ class Config:
     disc_pool_size = 3
     disc_pool_stride = 2
 
-    num_classes = 4         # set to 16 for training on bfa data
+    num_action_classes = 100
+    num_style_classes = 4       # de,di,me,mi
 
     trans_weight = 0.5
 

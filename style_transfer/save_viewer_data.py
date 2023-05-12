@@ -5,6 +5,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 
 from datasets.nc_mocap import NCMocapDataset
+from datasets.ActionStyleDataset import ActionStyleDataset
 from modules.networks import Generator
 
 import pickle
@@ -18,6 +19,10 @@ import matplotlib.pyplot as plt
 
 from collections import Counter
 import seaborn as sns
+from modules.transformer_vae import *
+
+from utils.utils import *
+from utils.tensors import *
 
 def process_file_name(file_name):
     d = file_name.split('_')
@@ -184,6 +189,38 @@ def result_visualize(model_name):
 
     show_tSNE(result)
 
+def result_tvae(model_name):
+    options = Config()
+    options.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"INFO | Device : {options.device}")
+
+    data_path = os.path.join(options.data_dir, "action_style_KTG.pkl")
+
+    with open(data_path, 'rb') as f:
+        data = pickle.load(f)
+
+    dataset = ActionStyleDataset(data['content'])
+    origin_dataset = data['content']
+    dataloader = DataLoader(dataset, batch_size=options.batch_size, shuffle=False, num_workers=8, collate_fn=collate)
+
+    options.use_cuda = (True if options.device == 'cuda' else False)
+
+    model = TVAE(options).to(options.device)
+    model.load_state_dict(torch.load('Result/' + model_name + '.pt'))
+    result = []
+    with torch.no_grad():
+        for idx, batch in enumerate(dataloader):
+            batch = {key: val.to(options.device) for key, val in batch.items()}
+            batch = model(batch)
+            for i,m in enumerate(batch['output']):
+                origin_data = origin_dataset[idx * model.config.batch_size + i]
+                d = origin_data.copy()
+                d["joint_rotation_matrix"] = m.reshape(len(m),26, 3, 2).cpu().numpy()
+                d['target_style'] = origin_data['persona']
+                result.append(d)
+
+    with open(f"datasets/data/decord_result_{model_name}.pkl", 'wb') as f:
+        pickle.dump(result, f)
 
 if __name__ == "__main__":
-    result_visualize("BaseMST_style_nohand_fixed_all.pkl_10000")
+    result_tvae("tVAE_120")

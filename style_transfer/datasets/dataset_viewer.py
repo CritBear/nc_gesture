@@ -284,10 +284,7 @@ class Viewer:
 
             time.sleep(self.frame_times[0])
 
-
-def main():
-    np.set_printoptions(precision=4, suppress=True)
-
+def view4style(path):
     viewer = Viewer()
     viewer.init_model()
     viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_M_28_de_01.bvh", model_offset=vector(-150, 0, 0),labelText="de")
@@ -295,17 +292,21 @@ def main():
     viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_M_28_me_01.bvh", model_offset=vector(0, 0, 0),labelText="me")
     viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_M_28_mi_01.bvh", model_offset=vector(75, 0, 0),labelText="mi")
     viewer.run_motion()
-    # for data_idx in range(0, 100):
-    #     viewer.init_model()
-    #     viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_R_12_de_01.bvh",model_offset=vector(-150,0,0))
-    #     viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_R_12_di_01.bvh", model_offset=vector(150, 0, 0))
-    #     #viewer.load_file("data/motion_body_fixed_nohand_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0), is_original_data = True)
-    #     #viewer.load_file("data/decord_result_BaseMST_style_nohand_fixed_all.pkl_10000.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0), is_original_data = False)
-    #     #viewer.load_file("data/decord_result_BaseMST_style_nohand_fixed_all.pkl_10000_2.pkl", pkl_idx=data_idx, model_offset=vector(150, 0, 0), is_original_data = False)
-    #
-    #     viewer.run_motion()
+def main():
+    np.set_printoptions(precision=4, suppress=True)
 
-    # viewer.run_motion("./motion_data/KTG/VAAI_Non_E_01_de_01.bvh")
+    viewer = Viewer()
+    viewer.init_model()
+
+    for data_idx in range(0, 100):
+        viewer.init_model()
+        #viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_R_12_de_01.bvh",model_offset=vector(-150,0,0))
+        #viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_R_12_di_01.bvh", model_offset=vector(150, 0, 0))
+        #viewer.load_file("data/action_style_KTG.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0), is_original_data = True)
+        viewer.load_file("data/decord_result_tVAE_120.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0), is_original_data = False)
+        #viewer.load_file("data/decord_result_BaseMST_style_nohand_fixed_all.pkl_10000_2.pkl", pkl_idx=data_idx, model_offset=vector(150, 0, 0), is_original_data = False)
+
+        viewer.run_motion()
 
     while True:
         time.sleep(5)

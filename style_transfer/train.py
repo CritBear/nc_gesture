@@ -21,7 +21,9 @@ from config import Config
 import random
 
 from utils.utils import *
-
+from utils.tensors import *
+from datasets.ActionStyleDataset import *
+from modules.transformer_vae import *
 
 def recon_criterion(predict, target):
     return torch.mean(torch.abs(predict - target))
@@ -101,82 +103,34 @@ def train():
         train_same_iterator = iter(train_same_style_dataloader)
         train_diff_iterator = iter(train_diff_style_dataloader)
 
-        if epoch % 2:
-            for idx, (content_motion_label, content_motion) in train_content_iterator:
-                content_motion = content_motion.to(options.device)
-                style_motion_label, style_motion = next(train_style_iterator)
-                style_motion = style_motion.to(options.device)
-                label1 =  torch.LongTensor(get_onehot_labels(style_motion_label))
-                with torch.no_grad():
-                    output_motion = model(content_motion, style_motion)
-                    recon_motion = model(content_motion, content_motion)
+        for idx, (content_motion_label, content_motion) in train_content_iterator:
+            content_motion = content_motion.to(options.device)
+            style_motion_label, style_motion = next(train_style_iterator)
+            _, same_style_motion = next(train_same_iterator)
+            _, diff_style_motion = next(train_diff_iterator)
 
-                label2 = torch.LongTensor(get_onehot_labels(content_motion_label))
-                adv_fake_loss1,_, _ = model.disc.calc_dis_fake_loss(output_motion.detach(),label1)
-                adv_fake_loss2, _, _ = model.disc.calc_dis_fake_loss(recon_motion.detach(), label2)
+            style_motion = style_motion.to(options.device)
 
-                adv_real_loss, _, _ = model.disc.calc_dis_real_loss(content_motion, label2)
+            output_motion = model(content_motion, style_motion)
+            recon_motion = model(content_motion,content_motion)
 
-                dis_loss = (adv_fake_loss1+ adv_fake_loss2)/2 + adv_real_loss
-                optimizer.zero_grad()
-                dis_loss.backward()
-                optimizer.step()
-                writer.add_scalar("Loss/dis_loss", dis_loss, epoch)
-                train_content_iterator.set_postfix({"train_loss": float(loss.mean())})
-        else:
-            for idx, (content_motion_label, content_motion) in train_content_iterator:
-                content_motion = content_motion.to(options.device)
-                style_motion_label, style_motion = next(train_style_iterator)
-                _, same_style_motion = next(train_same_iterator)
-                _, diff_style_motion = next(train_diff_iterator)
+            with torch.no_grad():
+                output_motion_style_code = model.get_style_code(output_motion)
+                style_motion_style_code = model.get_style_code(style_motion)
 
-                style_motion = style_motion.to(options.device)
+            #-----------------------------loss calculation---------------------------------------
+            #style_loss = MSELoss(output_motion_style_code, style_motion_style_code)
+            content_loss = recon_criterion(recon_motion,content_motion) #MSELoss(output_motion, content_motion) # reconstruction loss
+            loss = options.content_loss_weight * content_loss
 
-                output_motion = model(content_motion, style_motion)
-                recon_motion = model(content_motion,content_motion)
+            optimizer.zero_grad()
+            loss.mean().backward()
+            optimizer.step()
 
-                with torch.no_grad():
-                    output_motion_style_code = model.get_style_code(output_motion)
-                    style_motion_style_code = model.get_style_code(style_motion)
-
-                same_style_code = model.get_style_code(same_style_motion.to(options.device)) # for triplet loss
-                diff_style_code = model.get_style_code(diff_style_motion.to(options.device)) # for triplet loss
-
-                label1 = torch.LongTensor(get_onehot_labels(style_motion_label))
-                label2 = torch.LongTensor(get_onehot_labels(content_motion_label))
-
-
-                adv_loss1,acc1,gen_style_feat = model.disc.calc_gen_loss(output_motion,label1.to(options.device))
-                adv_loss2,acc2,gen_content_feat = model.disc.calc_gen_loss(recon_motion,label2.to(options.device))
-
-                _,content_feat = model.disc(content_motion,label2)
-                _,style_feat = model.disc(style_motion,label1)
-                content_feat_loss = recon_criterion(gen_content_feat.mean(2),content_feat.mean(2))
-                style_feat_loss = recon_criterion(gen_style_feat.mean(2),style_feat.mean(2))
-                ft_loss = (content_feat_loss + style_feat_loss)/2
-                #self.trans_p * trans + self.rec_p * rec
-                acc = (acc1 + acc2)/2
-                adv_loss = ((adv_loss1 + adv_loss2))/2
-
-                #-----------------------------loss calculation---------------------------------------
-                #style_loss = MSELoss(output_motion_style_code, style_motion_style_code)
-                content_loss = recon_criterion(recon_motion,content_motion) #MSELoss(output_motion, content_motion) # reconstruction loss
-                l_triplet = triplet_loss(style_motion_style_code, same_style_code ,diff_style_code)
-                loss = options.content_loss_weight * content_loss \
-                       + l_triplet * options.triplet_loss_weight + adv_loss * options.adv_loss_weight + ft_loss * options.ft_loss_weight
-
-                optimizer.zero_grad()
-                loss.mean().backward()
-                optimizer.step()
-
-                writer.add_scalar("Loss/train",loss,epoch)
-                writer.add_scalar("Loss/triplet_loss", l_triplet, epoch)
-                writer.add_scalar("Loss/recon_loss", content_loss, epoch)
-                #writer.add_scalar("Loss/style_loss", style_loss, epoch)
-                writer.add_scalar("Loss/adv_loss",adv_loss,epoch)
-                writer.add_scalar("Lss/ft_loss",ft_loss)
-                writer.add_scalar("Acc/dis_acc/train",acc,epoch)
-                train_content_iterator.set_postfix({"train_loss": float(loss.mean())})
+            writer.add_scalar("Loss/train",loss,epoch)
+            writer.add_scalar("Loss/recon_loss", content_loss, epoch)
+            #writer.add_scalar("Loss/style_loss", style_loss, epoch)
+            train_content_iterator.set_postfix({"train_loss": float(loss.mean())})
 
         print(f'Epoch {epoch + 1}/{options.num_epochs}')
         loss_history.append(loss.item())
@@ -192,8 +146,54 @@ def train():
     plt.ylabel('loss')
     plt.show()
 
+def train_tvae():
+    options = Config()
+    options.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"INFO | Device : {options.device}")
+    options.use_cuda = (True if options.device == 'cuda' else False)
 
+    data_path = os.path.join(options.data_dir, options.data_file_name)
+
+    with open(data_path, 'rb') as f:
+        data = pickle.load(f)
+
+    writer = SummaryWriter('logs/')
+
+    model = TVAE(options).to(options.device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=options.lr_gen)
+    MSELoss = torch.nn.MSELoss()
+
+    datasets = {"content":ActionStyleDataset(data['content']),"styled":ActionStyleDataset(data['styled'])}
+    iterators = {key: DataLoader(datasets[key], batch_size=options.batch_size,
+                                 shuffle=False, num_workers=8, collate_fn=collate)
+                 for key in datasets.keys()}
+
+    #styledIter = iter(iterators['styled'])
+    for epoch in range(options.num_epochs):
+        model.train()
+        optimizer.zero_grad()
+        train_iter = tqdm(enumerate(iterators['content']), total=len(iterators['content']), desc="training")
+        for i,batch in train_iter:
+            batch = {key: val.to(options.device) for key, val in batch.items()}
+            batch = model(batch)
+
+            #styledMotion = next(styledIter)
+            #print("styled:",styledMotion['x'].shape)
+            #print("out:",batch['output'].shape)
+            loss = MSELoss(batch['output'],batch['x'])
+            loss.mean().backward()
+
+            optimizer.step()
+            train_iter.set_postfix({"train_loss": float(loss.mean())})
+            writer.add_scalar("Loss/train", loss, epoch)
+
+        print(f'Epoch {epoch + 1}/{options.num_epochs}')
+        if epoch % 10 == 0:
+            torch.save(model.state_dict(), f"Result/tVAE_{epoch}.pt")
 if __name__ == "__main__":
     #load_result("train_result_BaseMST_motion_body_fixed_nohand_all.pkl_59340.pt.pkl")
     #result_visualize("BaseMST_motion_body_fixed_nohand_all.pkl_2000.pt")
-    train()
+    train_tvae()
+
+
+#tensorboard --logdir=C:\Users\user\Desktop\NC\git\nc_gesture\style_transfer\logs

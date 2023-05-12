@@ -6,11 +6,13 @@ import torch.nn.functional as F
 from nc_gesture.style_transfer.modules.blocks import ConvBlock, ResBlock, LinearBlock, \
     BottleNeckResBlock, Upsample, ConvLayers, ActiFirstResBlock, \
     get_conv_pad, get_norm_layer
+from nc_gesture import nc_attention_encoder as AE
 
 class Generator(nn.Module):
     def __init__(self, config):
         super(Generator, self).__init__()
         self.config = config
+        self.attention_encoder = AE.AttentionEncoder(100,config.num_joints,6,6)
         self.style_encoder = StyleEncoder(config)
         self.content_encoder = ContentEncoder(config)
         self.decoder = ContentDecoder(config)
@@ -18,8 +20,9 @@ class Generator(nn.Module):
         self.disc = Discriminator(config)
 
     def forward(self, content, style):
+        content = self.attention_encoder(content.transpose(1,2))
         z_s = self.style_encoder(style)
-        z_c = self.content_encoder(content)
+        z_c = self.content_encoder(content.transpose(1,2))
         out = self.decode(z_c, z_s)
         return out
 
@@ -184,7 +187,7 @@ class Discriminator(nn.Module):
         stride = config.disc_stride
         pool_ks = config.disc_pool_size
         pool_stride = config.disc_pool_stride
-        out_dim = config.num_classes
+        out_dim = config.num_style_classes
 
         assert down_n + 1 == len(channels)
 

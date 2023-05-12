@@ -3,6 +3,7 @@ import pickle
 import os
 import random
 from nc_gesture.style_transfer.utils.utils import *
+import itertools
 
 def get_same_action(action,dataset,usedId = -1):
     sames = []
@@ -56,4 +57,55 @@ def make_style_dataset(dataset_name):
         pickle.dump(style_dataset,f)
 
 
-#make_style_dataset(dataset_name="data/motion_body_fixed_nohand_all.pkl")
+
+
+def refine(data_path):
+
+    with open(data_path, 'rb') as f:
+        data = pickle.load(f)
+
+    arr = ['de','di','me','mi']
+    styleCombo = list(itertools.combinations(arr,2))
+
+    action_style_dict = {}
+
+    actionIdx = 0
+    for idx, d in enumerate(data):
+        action = process_file_name(d['file_name'])
+        data[idx]['action'] = action
+        if action in action_style_dict:
+            action_style_dict[action][d['persona']] = d
+            data[idx]['actionIdx'] = action_style_dict[action]['index']
+            if d['n_frames'] > action_style_dict[action]['maxIndex']:
+                action_style_dict[action]['maxIndex'] = d['n_frames']
+        else:
+            action_style_dict[action] = dict()
+            action_style_dict[action][d['persona']] = d
+            action_style_dict[action]['index'] = actionIdx
+            action_style_dict[action]['maxIndex'] = d['n_frames']
+            data[idx]['actionIdx'] = action_style_dict[action]['index']
+            actionIdx += 1
+
+    content = []
+    styled = []
+    for action in action_style_dict.keys():
+        if(action_style_dict[action]['maxIndex'] < 800):
+            for pair in styleCombo:
+                content.append(action_style_dict[action][pair[0]])
+                styled.append(action_style_dict[action][pair[1]])
+
+    datasets = {"content": content,"styled":styled}
+    with open('data/action_style_KTG.pkl', 'wb') as f:
+        pickle.dump(datasets,f)
+
+    #dataset1 = ActionStyleDataset(content)
+    #dataset2 = ActionStyleDataset(styled)
+
+    #datasets = {'content':dataset1,'styled':dataset2}
+    #test(datasets)
+
+if __name__ == '__main__':
+    refine("../../simple_rvae/datasets/data/motion_body_HJK.pkl")
+    #refine("../../simple_rvae/datasets/data/motion_body_KTG.pkl")
+
+    #make_style_dataset(dataset_name="data/motion_body_fixed_nohand_all.pkl")
