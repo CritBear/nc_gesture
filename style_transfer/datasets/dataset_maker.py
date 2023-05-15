@@ -59,7 +59,7 @@ def make_style_dataset(dataset_name):
 
 
 
-def refine(data_path):
+def make_pairs(data_path,max_length,fixed_length):
 
     with open(data_path, 'rb') as f:
         data = pickle.load(f)
@@ -86,26 +86,74 @@ def refine(data_path):
             data[idx]['actionIdx'] = action_style_dict[action]['index']
             actionIdx += 1
 
-    content = []
-    styled = []
+    pairdataset = []
     for action in action_style_dict.keys():
-        if(action_style_dict[action]['maxIndex'] < 800):
+        if(action_style_dict[action]['maxIndex'] < max_length):
             for pair in styleCombo:
-                content.append(action_style_dict[action][pair[0]])
-                styled.append(action_style_dict[action][pair[1]])
+                '''
+                split data
+                '''
+                l = min(action_style_dict[action][pair[0]]['n_frames'],action_style_dict[action][pair[1]]['n_frames'])
+                for i in range(0,l //fixed_length):
+                    s = max((int)(i * fixed_length - fixed_length * 0.1), 0)
+                    e = s + fixed_length
+                    if (e >= l): break
+                    cur = action_style_dict[action][pair[0]].copy()
+                    cur['n_frames'] = fixed_length
+                    cur['joint_rotation_matrix'] = action_style_dict[action][pair[0]]['joint_rotation_matrix'][s:e]
+                    cur['target_style'] = pair[1]
+                    cur['target_motion'] = action_style_dict[action][pair[1]]['joint_rotation_matrix'][s:e]
+                    pairdataset.append(cur.copy())
+    return pairdataset
 
-    datasets = {"content": content,"styled":styled}
-    with open('data/action_style_KTG.pkl', 'wb') as f:
-        pickle.dump(datasets,f)
+def refine():
+    pairdataset = make_pairs("../../simple_rvae/datasets/data/motion_body_HJK.pkl",800,200)
+    pairdataset += make_pairs("../../simple_rvae/datasets/data/motion_body_KTG.pkl",800,200)
+    with open('data/style_pair_all.pkl', 'wb') as f:
+        pickle.dump(pairdataset,f)
 
-    #dataset1 = ActionStyleDataset(content)
-    #dataset2 = ActionStyleDataset(styled)
+def for_fixed_recon(data,max_length,fixed_length):
 
-    #datasets = {'content':dataset1,'styled':dataset2}
-    #test(datasets)
+    dataset = []
+    for d in data:
+        l =  d['n_frames']
+        if l < max_length:
+            for i in range(l // fixed_length + 1):
+                s = max((int)(i * fixed_length - fixed_length*0.1),0)
+                e = s + fixed_length
+                if(e >= l) :break
+                cur = d.copy()
+                cur['n_frames'] = fixed_length
+                cur['joint_rotation_matrix'] = d['joint_rotation_matrix'][s:e]
+                cur['target_motion'] = d['joint_rotation_matrix'][s:e]
+                cur['target_style'] = cur['persona']
+                dataset.append(cur)
+
+
+    with open(f'data/fixed_{fixed_length}_all.pkl', 'wb') as f:
+        pickle.dump(dataset,f)
+
+def for_variable_recon(data,max_length):
+    dataset = []
+    for d in data:
+        l =  d['n_frames']
+        if l < max_length:
+            cur = d.copy()
+            cur['target_motion'] = d['joint_rotation_matrix']
+            cur['target_style'] = cur['persona']
+            dataset.append(cur)
+    with open('data/variable_all.pkl', 'wb') as f:
+        pickle.dump(dataset,f)
+
 
 if __name__ == '__main__':
-    refine("../../simple_rvae/datasets/data/motion_body_HJK.pkl")
+    with open("../../simple_rvae/datasets/data/motion_body_HJK.pkl", 'rb') as f:
+        d1 = pickle.load(f)
+    with open("../../simple_rvae/datasets/data/motion_body_KTG.pkl", 'rb') as f:
+        d2 = pickle.load(f)
+    for_fixed_recon(d1+d2,800,200)
+    #for_variable(d1+d2,800)
+    #refine()
     #refine("../../simple_rvae/datasets/data/motion_body_KTG.pkl")
 
     #make_style_dataset(dataset_name="data/motion_body_fixed_nohand_all.pkl")

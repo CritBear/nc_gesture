@@ -1,3 +1,5 @@
+import random
+
 import torch
 
 import numpy as np
@@ -194,20 +196,21 @@ def result_tvae(model_name):
     options.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"INFO | Device : {options.device}")
 
-    data_path = os.path.join(options.data_dir, "action_style_KTG.pkl")
+    data_path = os.path.join(options.data_dir, options.data_file_name)
 
     with open(data_path, 'rb') as f:
         data = pickle.load(f)
 
-    dataset = ActionStyleDataset(data['content'])
-    origin_dataset = data['content']
-    dataloader = DataLoader(dataset, batch_size=options.batch_size, shuffle=False, num_workers=8, collate_fn=collate)
+    dataset = ActionStyleDataset(data)
+    origin_dataset = data
+    dataloader = DataLoader(dataset, batch_size=options.batch_size, shuffle=False, collate_fn=collate)
 
     options.use_cuda = (True if options.device == 'cuda' else False)
 
     model = TVAE(options).to(options.device)
     model.load_state_dict(torch.load('Result/' + model_name + '.pt'))
     result = []
+
     with torch.no_grad():
         for idx, batch in enumerate(dataloader):
             batch = {key: val.to(options.device) for key, val in batch.items()}
@@ -215,12 +218,13 @@ def result_tvae(model_name):
             for i,m in enumerate(batch['output']):
                 origin_data = origin_dataset[idx * model.config.batch_size + i]
                 d = origin_data.copy()
-                d["joint_rotation_matrix"] = m.reshape(len(m),26, 3, 2).cpu().numpy()
-                d['target_style'] = origin_data['persona']
+                d["output"] = m.reshape(-1,26, 3, 2).cpu().numpy()
+                #d['target_motion'] = batch['x'][i].reshape(len(batch['x'][i]),26,3,2).cpu().numpy()
+                d['target_style'] = origin_data['target_style']
                 result.append(d)
 
     with open(f"datasets/data/decord_result_{model_name}.pkl", 'wb') as f:
         pickle.dump(result, f)
 
 if __name__ == "__main__":
-    result_tvae("tVAE_120")
+    result_tvae("tVAE_best_64_vel")

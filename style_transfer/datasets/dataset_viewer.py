@@ -1,3 +1,5 @@
+import random as rand
+
 import vpython.no_notebook
 from vpython import *
 
@@ -5,9 +7,10 @@ import numpy as np
 import math
 import pickle
 import time
-
+from scipy.signal import savgol_filter
 from nc_gesture.simple_rvae.datasets.dataset_utils.bvh_parser import Bvh
 
+import pandas as pd
 
 class BodyModel:
     def __init__(self, data, model_offset):
@@ -65,6 +68,7 @@ class PklModel(BodyModel):
 
     def update_joint(self, frame_idx, joint_idx):
         data = self.data
+
 
         rot_u = data['joint_rotation_matrix'][frame_idx][joint_idx][:, 0]
         rot_v = data['joint_rotation_matrix'][frame_idx][joint_idx][:, 1]
@@ -211,7 +215,8 @@ class Viewer:
         self.n_frames = []
         self.frame_times = []
 
-    def load_file(self, path, pkl_idx=0, model_offset=vector(0, 0, 0), inference_path=None, is_original_data = True,labelText= None):
+
+    def load_file(self, path, pkl_idx=0, model_offset=vector(0, 0, 0), inference_path=None, is_original_data = True, labelText= None,motion_data = None):
         if 'bvh' in path:
             with open(path) as f:
                 bvh = Bvh(f.read())
@@ -221,22 +226,39 @@ class Viewer:
             n_frames = bvh.n_frames
             frame_time = bvh.frame_time
             n_joints = len(bvh.nodes)
-            print(f'Frame length : {n_frames}')
 
             if labelText:
-                self.texts.append(text(text=labelText,pos=vector(model_offset.x, model_offset.y - 7, model_offset.z), align="center", height=10))
+                self.texts.append(text(text=labelText,pos=vector(model_offset.x, model_offset.y - 10, model_offset.z), align="center", height=10))
 
         elif 'pkl' in path:
 
-            with open(path, 'rb') as f:
-                pkl_data = pickle.load(f)[pkl_idx]
-
-            if is_original_data:
-                self.texts.append(text(text='original style: {}'.format(pkl_data['persona']),
-                                       pos=vector(model_offset.x, model_offset.y - 7, model_offset.z), align="center", height=10))
+            if motion_data:
+                pkl_data = motion_data
             else:
-                self.texts.append(text(text='stylized motion: {}'.format(pkl_data['target_style']),
-                                       pos=vector(model_offset.x, model_offset.y - 7, model_offset.z), align="center", height=10))
+                with open(path, 'rb') as f:
+                    pkl_data = pickle.load(f)[pkl_idx]
+
+            style = pkl_data['persona']
+            if is_original_data:
+                if 'output' in pkl_data:
+                    output = pkl_data['output'].reshape(-1,156).copy()
+                    # print(len(output))
+                    # for i,f in enumerate(output):
+                    #      output[i] = savgol_filter(output[i], 51, 3)
+                    pkl_data['joint_rotation_matrix'] = output.reshape(-1,26,3,2)
+                    style = pkl_data['target_style']
+                else:
+                    self.texts.append(
+                        text(text=pkl_data['file_name'], pos=vector(model_offset.x, model_offset.y - 15, model_offset.z),
+                             align="center", height=5))
+
+            else:
+                if 'target_motion' in pkl_data:
+                    pkl_data['joint_rotation_matrix'] = pkl_data['target_motion']
+                    style = pkl_data['target_style']
+
+            if labelText:
+                self.texts.append(text(text=labelText+" (" + style+")",pos=vector(model_offset.x, model_offset.y - 10, model_offset.z), align="center", height=10))
 
             if inference_path is not None:
                 with open(inference_path, 'rb') as f:
@@ -284,26 +306,46 @@ class Viewer:
 
             time.sleep(self.frame_times[0])
 
-def view4style(path):
-    viewer = Viewer()
-    viewer.init_model()
-    viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_M_28_de_01.bvh", model_offset=vector(-150, 0, 0),labelText="de")
-    viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_M_28_di_01.bvh", model_offset=vector(-75, 0, 0),labelText="di")
-    viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_M_28_me_01.bvh", model_offset=vector(0, 0, 0),labelText="me")
-    viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_M_28_mi_01.bvh", model_offset=vector(75, 0, 0),labelText="mi")
-    viewer.run_motion()
+def view4style(path,start,end):
+    data_path = path#"C:/Users/user/Desktop/NC/git/nc_gesture/simple_rvae/datasets/data/motion_body_hand_KTG.pkl"
+    with open(data_path, 'rb') as f:
+        motion_data = pickle.load(f)
+
+    for data_idx in range(start, end,4):
+        viewer = Viewer()
+        viewer.init_model()
+        viewer.load_file("C:/Users/user/Desktop/NC/git/nc_gesture/simple_rvae/datasets/data/motion_body_hand_KTG.pkl",
+                         pkl_idx=data_idx, model_offset=vector(-50, 20, 0),
+                         is_original_data=True, data=motion_data[data_idx])
+        viewer.load_file("C:/Users/user/Desktop/NC/git/nc_gesture/simple_rvae/datasets/data/motion_body_hand_KTG.pkl",
+                         pkl_idx=data_idx + 1, model_offset=vector(50, 20, 0),
+                         is_original_data=True, data=motion_data[data_idx + 1])
+        viewer.load_file("C:/Users/user/Desktop/NC/git/nc_gesture/simple_rvae/datasets/data/motion_body_hand_KTG.pkl",
+                         pkl_idx=data_idx + 2, model_offset=vector(-50, -200, 0),
+                         is_original_data=True, data=motion_data[data_idx + 2])
+        viewer.load_file("C:/Users/user/Desktop/NC/git/nc_gesture/simple_rvae/datasets/data/motion_body_hand_KTG.pkl",
+                         pkl_idx=data_idx + 3, model_offset=vector(50, -200, 0),
+                         is_original_data=True, data=motion_data[data_idx + 3])
+        viewer.run_motion()
 def main():
     np.set_printoptions(precision=4, suppress=True)
 
     viewer = Viewer()
     viewer.init_model()
 
-    for data_idx in range(0, 100):
+    start = 0
+    end = 200
+    for data_idx in range(start, end, 4):
         viewer.init_model()
+        #data_idx = rand.randint(start ,end)
         #viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_R_12_de_01.bvh",model_offset=vector(-150,0,0))
         #viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_R_12_di_01.bvh", model_offset=vector(150, 0, 0))
-        #viewer.load_file("data/action_style_KTG.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0), is_original_data = True)
-        viewer.load_file("data/decord_result_tVAE_120.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0), is_original_data = False)
+        #viewer.load_file("data/fixed_800_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0), is_original_data = True)
+        #viewer.load_file("data/style_pair_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0),is_original_data=True,labelText="original")
+        #viewer.load_file("data/style_pair_all.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0),is_original_data=False,labelText="styled")
+        viewer.load_file("data/variable_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0),is_original_data=True,labelText="original")
+        viewer.load_file("data/variable_all.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0),is_original_data=False,labelText="styled")
+        viewer.load_file("data/decord_result_tVAE_best_64_vel.pkl", pkl_idx=data_idx, model_offset=vector(150, 0, 0), is_original_data = True, labelText= "output")
         #viewer.load_file("data/decord_result_BaseMST_style_nohand_fixed_all.pkl_10000_2.pkl", pkl_idx=data_idx, model_offset=vector(150, 0, 0), is_original_data = False)
 
         viewer.run_motion()

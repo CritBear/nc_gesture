@@ -19,6 +19,8 @@ import numpy as np
 #     'persona': None
 #     'action' :
 #     'actionIdx':
+#        'target_style':
+#     'target_motion': (n_frames x n_joints x 3 x 2)
 # }
 class ActionStyleDataset(Dataset):
     data_name = 'nc_mocap'
@@ -33,12 +35,15 @@ class ActionStyleDataset(Dataset):
         return len(self._data)
 
     def __getitem__(self, idx):
-        style = to_index(self._data[idx]['persona'])
-        action = self._data[idx]['actionIdx']
-        action_style = {'action':action,'style':style}
+        target_style = to_index(self._data[idx]['target_style'])
+        target_motion = self._data[idx]['target_motion'].reshape(
+            self._data[idx]['target_motion'].shape[0],
+             -1 ).astype(np.float32)
+
+        target = {'target_motion':target_motion,'style':target_style}
 
         motion = self._data[idx]['joint_rotation_matrix'].reshape(
             self._data[idx]['joint_rotation_matrix'].shape[0],
             -1
         ).astype(np.float32)  # [frames x joints x 3 x 3] -> [frames x pose data]
-        return torch.from_numpy(motion),action_style
+        return torch.from_numpy(motion),target

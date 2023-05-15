@@ -21,16 +21,17 @@ def collate_tensors(batch):
 
 def collate(batch):
     databatch = [b[0] for b in batch]
-    actionbatch = [b[1]['action'] for b in batch]
+    targetbatch = [b[1]['target_motion'] for b in batch]
     stylebatch = [b[1]['style'] for b in batch]
     lenbatch = [len(b[0]) for b in batch]
 
     databatchTensor = collate_tensors(databatch)
-    acntionbatchTensor = torch.as_tensor(actionbatch)
+    targetbatch = collate_tensors(databatch)
+    #acntionbatchTensor = torch.as_tensor(actionbatch)
     stylebatchTensor = torch.as_tensor(stylebatch)
     lenbatchTensor = torch.as_tensor(lenbatch)
-
     maskbatchTensor = lengths_to_mask(lenbatchTensor)
-    batch = {"x": databatchTensor, "action": acntionbatchTensor,"style":stylebatchTensor,
-             "mask": maskbatchTensor, "lengths": lenbatchTensor}
+
+    batch = {"x": databatchTensor,"style":stylebatchTensor,
+             "mask": maskbatchTensor, "lengths": lenbatchTensor,"target_motion":targetbatch}
     return batch

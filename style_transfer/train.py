@@ -24,6 +24,7 @@ from utils.utils import *
 from utils.tensors import *
 from datasets.ActionStyleDataset import *
 from modules.transformer_vae import *
+from sklearn.model_selection import train_test_split
 
 def recon_criterion(predict, target):
     return torch.mean(torch.abs(predict - target))
@@ -146,6 +147,15 @@ def train():
     plt.ylabel('loss')
     plt.show()
 
+
+def getLoss(batch):
+    MSELoss = torch.nn.MSELoss()
+    beta = 0
+    recon_loss,vel_loss = MSELoss(batch['output'], batch['x']),compute_vel_mse_loss(batch)#, kl_divergence(batch["mu"], batch["logvar"])
+    loss = (1 - beta) * (recon_loss + 10 * vel_loss)
+    lossdict = {"recon Loss":recon_loss,"vel_loss":vel_loss} #,"kl_loss":kl_loss
+    return loss,lossdict
+
 def train_tvae():
     options = Config()
     options.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -160,36 +170,62 @@ def train_tvae():
     writer = SummaryWriter('logs/')
 
     model = TVAE(options).to(options.device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=options.lr_gen)
-    MSELoss = torch.nn.MSELoss()
+    #model.load_state_dict(torch.load('Result/tVAE_best.pt'))
+    optimizer = torch.optim.AdamW(model.parameters(), lr=options.lr_gen)
 
-    datasets = {"content":ActionStyleDataset(data['content']),"styled":ActionStyleDataset(data['styled'])}
+
+    dataset = ActionStyleDataset(data)
+    train_size = int(0.8 * len(dataset))
+    test_size = len(dataset) - train_size
+
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+
+    datasets = {"train": train_dataset,"val":test_dataset}
     iterators = {key: DataLoader(datasets[key], batch_size=options.batch_size,
-                                 shuffle=False, num_workers=8, collate_fn=collate)
+                                 shuffle=True, collate_fn=collate)
                  for key in datasets.keys()}
 
-    #styledIter = iter(iterators['styled'])
+    min_val_loss = 10
     for epoch in range(options.num_epochs):
         model.train()
-        optimizer.zero_grad()
-        train_iter = tqdm(enumerate(iterators['content']), total=len(iterators['content']), desc="training")
-        for i,batch in train_iter:
-            batch = {key: val.to(options.device) for key, val in batch.items()}
-            batch = model(batch)
+        train_iter = tqdm(enumerate(iterators['train']), total=len(iterators['train']), desc="training")
 
-            #styledMotion = next(styledIter)
-            #print("styled:",styledMotion['x'].shape)
-            #print("out:",batch['output'].shape)
-            loss = MSELoss(batch['output'],batch['x'])
-            loss.mean().backward()
+        with torch.enable_grad():
+            for i,batch in train_iter:
+                batch = {key: val.to(options.device) for key, val in batch.items()}
+                batch = model(batch)
 
-            optimizer.step()
-            train_iter.set_postfix({"train_loss": float(loss.mean())})
-            writer.add_scalar("Loss/train", loss, epoch)
+                loss,lossdict = getLoss(batch)
 
-        print(f'Epoch {epoch + 1}/{options.num_epochs}')
-        if epoch % 10 == 0:
+                optimizer.zero_grad()
+                loss.mean().backward()
+                optimizer.step()
+
+                train_iter.set_postfix({"train_loss": float(loss.mean())})
+
+        model.eval()
+        with torch.no_grad():
+            val_loss = 0
+            for i, batch in enumerate(iterators['val']):
+                batch = {key: val.to(options.device) for key, val in batch.items()}
+                batch = model(batch)
+                loss,lossdict  = getLoss(batch)
+                val_loss += loss
+            val_loss /= len(iterators['val'])
+            if min_val_loss > val_loss:
+                min_val_loss = val_loss
+                torch.save(model.state_dict(), f"Result/tVAE_best.pt")
+
+        writer.add_scalar("Loss/train", loss, epoch)
+        writer.add_scalar("Loss/val", val_loss, epoch)
+        for key in lossdict.keys():
+            writer.add_scalar(f'{key}/train', lossdict[key], epoch)
+
+        print(f"Epoch {epoch + 1}/{options.num_epochs}, Loss: {loss.mean()}, Val Loss: {val_loss}")
+        if epoch % 100 == 0:
             torch.save(model.state_dict(), f"Result/tVAE_{epoch}.pt")
+
+
 if __name__ == "__main__":
     #load_result("train_result_BaseMST_motion_body_fixed_nohand_all.pkl_59340.pt.pkl")
     #result_visualize("BaseMST_motion_body_fixed_nohand_all.pkl_2000.pt")

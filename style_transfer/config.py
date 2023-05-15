@@ -13,7 +13,7 @@ class Config:
     # data paths
     data_dir = pjoin(BASEPATH, 'datasets\data')
     expr_dir = BASEPATH
-    data_file_name = "action_style_KTG.pkl"
+    data_file_name = "fixed_200_all.pkl"
 
     # model paths
     main_dir = None
@@ -32,14 +32,14 @@ class Config:
     # optimization options
     num_epochs = 100000              # maximum number of training iterations
     weight_decay = 0.0001          # weight decay
-    lr_gen = 0.0001                # learning rate for the generator
+    lr_gen = 0.0001 #0.0001                # learning rate for the generator
     lr_dis = 0.0001                # learning rate for the discriminator
     weight_init = 'kaiming'                 # initialization [gaussian/kaiming/xavier/orthogonal]
     lr_policy = None
 
     triplet_margin = 1
     # Training
-    batch_size = 3 # 128
+    batch_size = 40 # 128
 
     # Testing
     test_batch_n = 56  # number of test clips
@@ -57,6 +57,8 @@ class Config:
     # input: T * 64
     num_feats = 6
 
+    latent_dim = 64
+    num_heads = 4
     rot_channels = 100  # 128
     pos3d_channels = 100  # 64
 

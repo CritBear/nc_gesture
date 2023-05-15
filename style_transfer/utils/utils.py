@@ -1,3 +1,5 @@
+import numpy as np
+from scipy.signal import bspline, cubic, quadratic
 
 def process_file_name(file_name):
     d = file_name.split('_')
@@ -29,4 +31,10 @@ def to_index(style):
         return 3#[0,0,0,1]
     else:
         raise ValueError
+
+
+def smooth(motion):
+    return
+
+
 
