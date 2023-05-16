@@ -1,5 +1,6 @@
 import random as rand
 
+import matplotlib.pyplot as plt
 import vpython.no_notebook
 from vpython import *
 
@@ -216,7 +217,7 @@ class Viewer:
         self.frame_times = []
 
 
-    def load_file(self, path, pkl_idx=0, model_offset=vector(0, 0, 0), inference_path=None, is_original_data = True, labelText= None,motion_data = None):
+    def load_file(self, path, pkl_idx=0, model_offset=vector(0, 0, 0), inference_path=None, is_original_data = True, labelText= None,denoising = False,motion_data = None):
         if 'bvh' in path:
             with open(path) as f:
                 bvh = Bvh(f.read())
@@ -241,11 +242,14 @@ class Viewer:
             style = pkl_data['persona']
             if is_original_data:
                 if 'output' in pkl_data:
-                    output = pkl_data['output'].reshape(-1,156).copy()
-                    # print(len(output))
-                    # for i,f in enumerate(output):
-                    #      output[i] = savgol_filter(output[i], 51, 3)
-                    pkl_data['joint_rotation_matrix'] = output.reshape(-1,26,3,2)
+                    if denoising:
+                        output = pkl_data['output'].reshape(-1, 156).transpose().copy()
+                        for i in range(0,len(output)):
+                            output[i] = savgol_filter(output[i],51,10)
+                        output = output.transpose()
+                        pkl_data['joint_rotation_matrix'] = output.reshape(-1,26,3,2)
+                    else:
+                        pkl_data['joint_rotation_matrix'] =  pkl_data['output']
                     style = pkl_data['target_style']
                 else:
                     self.texts.append(
@@ -341,11 +345,15 @@ def main():
         #viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_R_12_de_01.bvh",model_offset=vector(-150,0,0))
         #viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_R_12_di_01.bvh", model_offset=vector(150, 0, 0))
         #viewer.load_file("data/fixed_800_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0), is_original_data = True)
-        #viewer.load_file("data/style_pair_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0),is_original_data=True,labelText="original")
-        #viewer.load_file("data/style_pair_all.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0),is_original_data=False,labelText="styled")
-        viewer.load_file("data/variable_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0),is_original_data=True,labelText="original")
-        viewer.load_file("data/variable_all.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0),is_original_data=False,labelText="styled")
-        viewer.load_file("data/decord_result_tVAE_best_64_vel.pkl", pkl_idx=data_idx, model_offset=vector(150, 0, 0), is_original_data = True, labelText= "output")
+        viewer.load_file("data/style_pair_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0),is_original_data=True,labelText="original")
+        viewer.load_file("data/style_pair_all.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0),is_original_data=False,labelText="styled")
+        #viewer.load_file("data/variable_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0),is_original_data=True,labelText="original")
+        # viewer.load_file("data/variable_all.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0),is_original_data=False,labelText="styled")
+        #viewer.load_file("data/fixed_300_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0),is_original_data=True,labelText="original")
+        #viewer.load_file("data/fixed_300_all.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0),is_original_data=False,labelText="styled")
+        viewer.load_file("data/decord_result_tVAE_best_128_8_sequence.pkl", pkl_idx=data_idx, model_offset=vector(150, 0, 0), is_original_data = True, labelText= "output")
+        viewer.load_file("data/decord_result_tVAE_best_128_8_sequence.pkl", pkl_idx=data_idx, model_offset=vector(300, 0, 0),
+                         is_original_data=True, labelText="output",denoising=True)
         #viewer.load_file("data/decord_result_BaseMST_style_nohand_fixed_all.pkl_10000_2.pkl", pkl_idx=data_idx, model_offset=vector(150, 0, 0), is_original_data = False)
 
         viewer.run_motion()

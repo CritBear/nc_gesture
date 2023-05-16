@@ -142,7 +142,7 @@ def for_variable_recon(data,max_length):
             cur['target_motion'] = d['joint_rotation_matrix']
             cur['target_style'] = cur['persona']
             dataset.append(cur)
-    with open('data/variable_all.pkl', 'wb') as f:
+    with open('data/variable_600_all.pkl', 'wb') as f:
         pickle.dump(dataset,f)
 
 
@@ -151,8 +151,8 @@ if __name__ == '__main__':
         d1 = pickle.load(f)
     with open("../../simple_rvae/datasets/data/motion_body_KTG.pkl", 'rb') as f:
         d2 = pickle.load(f)
-    for_fixed_recon(d1+d2,800,200)
-    #for_variable(d1+d2,800)
+    #for_fixed_recon(d1+d2,800,300)
+    for_variable_recon(d1+d2,600)
     #refine()
     #refine("../../simple_rvae/datasets/data/motion_body_KTG.pkl")
 

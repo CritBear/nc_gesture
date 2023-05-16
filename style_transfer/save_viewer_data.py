@@ -26,6 +26,8 @@ from modules.transformer_vae import *
 from utils.utils import *
 from utils.tensors import *
 
+import matplotlib.pyplot as plt
+
 def process_file_name(file_name):
     d = file_name.split('_')
     action =''.join(d[:4])
@@ -227,4 +229,4 @@ def result_tvae(model_name):
         pickle.dump(result, f)
 
 if __name__ == "__main__":
-    result_tvae("tVAE_best_64_vel")
+    result_tvae("tVAE_best_128_8_sequence")
