@@ -120,7 +120,47 @@ def show_tSNE(latent_data):
     plt.ylabel('tsne_1')
     plt.legend()
     plt.show()
+def show_tSNE():
+    with open("datasets/data/classifier_900_high.pkl", 'rb') as f:
+        motion_data = pickle.load(f)
 
+    motion = []
+    style = []
+    for m in motion_data:
+        motion.append(m['joint_rotation_matrix'].reshape(-1))
+        style.append(m['persona'])
+    tsne = TSNE(n_components=2, perplexity=50).fit_transform(np.array(motion))
+    # print(tsne)
+
+    di_idx_list = []
+    de_idx_list = []
+    mi_idx_list = []
+    me_idx_list = []
+
+    for idx, style in enumerate(style):
+        if style == 'di':
+            di_idx_list.append(idx)
+        elif style == 'de':
+            de_idx_list.append(idx)
+        elif style == 'mi':
+            mi_idx_list.append(idx)
+        elif style == 'me':
+            me_idx_list.append(idx)
+
+    di_tsne = tsne[di_idx_list]
+    de_tsne = tsne[de_idx_list]
+    mi_tsne = tsne[mi_idx_list]
+    me_tsne = tsne[me_idx_list]
+
+    plt.scatter(di_tsne[:, 0], di_tsne[:, 1], color='pink', label='di')
+    plt.scatter(de_tsne[:, 0], de_tsne[:, 1], color='purple', label='de')
+    plt.scatter(mi_tsne[:, 0], mi_tsne[:, 1], color='green', label='mi')
+    plt.scatter(me_tsne[:, 0], me_tsne[:, 1], color='blue', label='me')
+
+    plt.xlabel('tsne_0')
+    plt.ylabel('tsne_1')
+    plt.legend()
+    plt.show()
 def result_visualize(model_name):
     options = Config()
     options.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -220,6 +260,45 @@ def result_tvae(model_name):
             for i,m in enumerate(batch['output']):
                 origin_data = origin_dataset[idx * model.config.batch_size + i]
                 d = origin_data.copy()
+                mask = batch['mask'][i]
+                outmasked = m[mask]
+                d['n_frames'] = len(outmasked)
+                d["output"] = outmasked.reshape(-1, 26, 3, 2).cpu().numpy()
+                #d['target_motion'] = batch['x'][i].reshape(len(batch['x'][i]),26,3,2).cpu().numpy()
+                d['target_style'] = origin_data['target_style']
+                result.append(d)
+
+    with open(f"datasets/data/decord_result_{model_name}.pkl", 'wb') as f:
+        pickle.dump(result, f)
+
+def result_tvae_decode(model_name):
+    options = Config()
+    options.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"INFO | Device : {options.device}")
+
+    data_path = os.path.join(options.data_dir, options.data_file_name)
+
+    with open(data_path, 'rb') as f:
+        data = pickle.load(f)
+
+    dataset = ActionStyleDataset(data)
+    origin_dataset = data
+    dataloader = DataLoader(dataset, batch_size=options.batch_size, shuffle=False, collate_fn=collate)
+
+    options.use_cuda = (True if options.device == 'cuda' else False)
+
+    model = TVAE(options).to(options.device)
+    model.load_state_dict(torch.load('Result/' + model_name + '.pt'))
+    result = []
+
+    with torch.no_grad():
+        for idx, batch in enumerate(dataloader):
+            batch = {key: val.to(options.device) for key, val in batch.items()}
+            batch['z'] = torch.randn(batch['x'].shape[0],options.latent_dim, device=options.device)
+            batch = model.decode(batch)
+            for i,m in enumerate(batch['output']):
+                origin_data = origin_dataset[idx * model.config.batch_size + i]
+                d = origin_data.copy()
                 d["output"] = m.reshape(-1,26, 3, 2).cpu().numpy()
                 #d['target_motion'] = batch['x'][i].reshape(len(batch['x'][i]),26,3,2).cpu().numpy()
                 d['target_style'] = origin_data['target_style']
@@ -228,5 +307,49 @@ def result_tvae(model_name):
     with open(f"datasets/data/decord_result_{model_name}.pkl", 'wb') as f:
         pickle.dump(result, f)
 
+def result_tvae(model_name):
+    options = Config()
+    options.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"INFO | Device : {options.device}")
+
+    data_path = os.path.join(options.data_dir, options.data_file_name)
+
+    with open(data_path, 'rb') as f:
+        data = pickle.load(f)
+
+    dataset = ActionStyleDataset(data)
+    origin_dataset = data
+    dataloader = DataLoader(dataset, batch_size=options.batch_size, shuffle=False, collate_fn=collate)
+
+    options.use_cuda = (True if options.device == 'cuda' else False)
+
+
+    model = TVAE(options).to(options.device)
+    model.load_state_dict(torch.load('Result/' + model_name + '.pt'))
+    result = []
+
+    with torch.no_grad():
+        for idx, batch in enumerate(dataloader):
+            batch = {key: val.to(options.device) for key, val in batch.items()}
+            batch = model(batch)
+            for i,m in enumerate(batch['output']):
+                origin_data = origin_dataset[idx * model.config.batch_size + i]
+                d = origin_data.copy()
+                mask = batch['mask'][i]
+                outmasked = m[mask]
+                first_false_indices = (mask == False).nonzero()
+                if first_false_indices.numel() > 0:
+                    first_false_index = first_false_indices.min().item()
+                    d['n_frames'] = first_false_index
+                d["output"] = outmasked.reshape(-1, 26, 3, 2).cpu().numpy()
+                #d['target_motion'] = batch['x'][i].reshape(len(batch['x'][i]),26,3,2).cpu().numpy()
+                d['target_style'] = origin_data['target_style']
+                result.append(d)
+
+    with open(f"datasets/data/decord_result_{model_name}.pkl", 'wb') as f:
+        pickle.dump(result, f)
+
+
 if __name__ == "__main__":
-    result_tvae("tVAE_best_128_8_sequence")
+    #show_tSNE()
+    result_tvae("tVAE_best")

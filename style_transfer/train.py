@@ -4,7 +4,7 @@ import numpy as np
 
 from torch.utils.data import DataLoader
 
-from torch.utils.tensorboard import SummaryWriter
+
 
 
 from nc_gesture.simple_rvae.datasets.nc_mocap import NCMocapDataset
@@ -12,7 +12,7 @@ from modules.networks import Generator
 
 import pickle
 from tqdm import tqdm
-
+from torch.utils.tensorboard import SummaryWriter
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
@@ -151,9 +151,9 @@ def train():
 def getLoss(batch):
     MSELoss = torch.nn.MSELoss()
     beta = 0
-    recon_loss,vel_loss = MSELoss(batch['output'], batch['x']),compute_vel_mse_loss(batch)#, kl_divergence(batch["mu"], batch["logvar"])
-    loss = (1 - beta) * (recon_loss + 10 * vel_loss)
-    lossdict = {"recon Loss":recon_loss,"vel_loss":vel_loss} #,"kl_loss":kl_loss
+    recon_loss,test_loss, vel_loss = compute_mse_loss(batch) ,MSELoss(batch['output'],batch['x']),compute_vel_mse_loss(batch)#, kl_divergence(batch["mu"], batch["logvar"])
+    loss = (1 - beta) * (recon_loss)
+    lossdict = {"recon Loss":recon_loss,"vel_loss":vel_loss,"test_loss":test_loss} #,"kl_loss":kl_loss
     return loss,lossdict
 
 def train_tvae():
@@ -170,7 +170,7 @@ def train_tvae():
     writer = SummaryWriter('logs/')
 
     model = TVAE(options).to(options.device)
-    #model.load_state_dict(torch.load('Result/tVAE_best.pt'))
+    model.load_state_dict(torch.load('Result/tVAE_best.pt'))
     optimizer = torch.optim.AdamW(model.parameters(), lr=options.lr_gen)
 
 

@@ -1,9 +1,9 @@
 import numpy as np
-from scipy.signal import bspline, cubic, quadratic
+from scipy.signal import savgol_filter
 
 def process_file_name(file_name):
     d = file_name.split('_')
-    action =''.join(d[:4])
+    action =''.join(d[:-2])
     return action
 
 def get_style_from_name(file_name):
@@ -33,8 +33,12 @@ def to_index(style):
         raise ValueError
 
 
-def smooth(motion):
-    return
+def motion_denosing(motion,window_size = 60, polygonal = 8,joint_num=26):
+    output = motion.reshape(-1, joint_num * 6).transpose().copy()
+    for i in range(0, len(output)):
+        output[i] = savgol_filter(output[i], window_size, polygonal)
+    output = output.transpose()
+    return output.reshape(-1, joint_num, 3, 2)
 
 
 

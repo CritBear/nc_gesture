@@ -15,15 +15,18 @@ def kl_divergence(mu, logvar):
 def compute_mse_loss(batch):
     x = batch['target_motion']
     output = batch['output']
+
     mask = batch['mask']
+
     gtmasked = x[mask]
     outmasked = output[mask]
+
     loss = F.mse_loss(gtmasked, outmasked, reduction='mean')
     return loss
 
 def compute_vel_mse_loss(batch):
-    x = batch["output"].permute(0, 2, 1)
-    output = batch["x"].permute(0, 2, 1)
+    x = batch["x"].permute(0, 2, 1)
+    output = batch["output"].permute(0, 2, 1)
 
     gtvel = (x[..., 1:] - x[..., :-1])
     outputvel = (output[..., 1:] - output[..., :-1])
@@ -36,8 +39,8 @@ def compute_vel_mse_loss(batch):
     loss = F.mse_loss(gtvelmasked, outvelmasked, reduction='mean')
     return loss
 def compute_avg_vel_mse_loss(batch):
-    x = batch["output"].permute(0, 2, 1)
-    output = batch["target_motion"].permute(0, 2, 1)
+    x = batch["target_motion"].permute(0, 2, 1)
+    output = batch["output"].permute(0, 2, 1)
 
     gtvel = (x[..., 1:] - x[..., :-1])
     outputvel = (output[..., 1:] - output[..., :-1])
@@ -58,9 +61,9 @@ class TVAE(nn.Module):
         super(TVAE, self).__init__()
         self.config = config
         self.encoder = Encoder_TRANSFORMER("TVAE",config.num_joints,config.num_feats,config.num_channel,
-                                           config.num_action_classes,config.num_style_classes,latent_dim= config.latent_dim,num_heads=config.num_heads)
+                                           config.num_style_classes,latent_dim= config.latent_dim,num_heads=config.num_heads)
         self.decoder = Decoder_TRANSFORMER("TVAE",config.num_joints,config.num_feats,config.num_channel,
-                                           config.num_action_classes,config.num_style_classes,latent_dim= config.latent_dim,num_heads=config.num_heads)
+                                           config.num_style_classes,latent_dim= config.latent_dim,num_heads=config.num_heads)
     def reparameterize(self, batch, seed=None):
         mu, logvar = batch["mu"], batch["logvar"]
         std = torch.exp(logvar / 2)

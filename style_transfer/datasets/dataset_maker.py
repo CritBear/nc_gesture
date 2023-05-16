@@ -145,6 +145,30 @@ def for_variable_recon(data,max_length):
     with open('data/variable_600_all.pkl', 'wb') as f:
         pickle.dump(dataset,f)
 
+def for_classifier(data,max_length):
+    static = {}
+    dataset = []
+    fixed_length = 300
+    with open("../../classifier/high_action.pkl", 'rb') as f:
+        d1 = pickle.load(f)
+    for d in data:
+        l =  d['n_frames']
+        if l < max_length and l > fixed_length:
+            for j in range((d["n_frames"] // fixed_length)*2):
+                cur = d.copy()
+                s = max((int)(j * fixed_length - fixed_length*0.2),0)
+                e = s + fixed_length
+                if e > d["n_frames"]:
+                    break
+                cur['n_frames'] = fixed_length
+                cur['joint_rotation_matrix'] = d['joint_rotation_matrix'][s:e]
+                dataset.append(cur)
+    for key,val in static.items():
+        if len(val) < 4:
+            print(key)
+    print(len(d1)*8,len(dataset))
+    with open(f'data/classifier_{max_length}_high.pkl', 'wb') as f:
+        pickle.dump(dataset,f)
 
 if __name__ == '__main__':
     with open("../../simple_rvae/datasets/data/motion_body_HJK.pkl", 'rb') as f:
@@ -152,7 +176,8 @@ if __name__ == '__main__':
     with open("../../simple_rvae/datasets/data/motion_body_KTG.pkl", 'rb') as f:
         d2 = pickle.load(f)
     #for_fixed_recon(d1+d2,800,300)
-    for_variable_recon(d1+d2,600)
+    #for_variable_recon(d1+d2,600)
+    for_classifier(d1+d2,900)
     #refine()
     #refine("../../simple_rvae/datasets/data/motion_body_KTG.pkl")
 

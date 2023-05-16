@@ -10,8 +10,11 @@ import pickle
 import time
 from scipy.signal import savgol_filter
 from nc_gesture.simple_rvae.datasets.dataset_utils.bvh_parser import Bvh
+from nc_gesture.style_transfer.utils.utils import *
 
 import pandas as pd
+
+
 
 class BodyModel:
     def __init__(self, data, model_offset):
@@ -69,7 +72,6 @@ class PklModel(BodyModel):
 
     def update_joint(self, frame_idx, joint_idx):
         data = self.data
-
 
         rot_u = data['joint_rotation_matrix'][frame_idx][joint_idx][:, 0]
         rot_v = data['joint_rotation_matrix'][frame_idx][joint_idx][:, 1]
@@ -216,8 +218,8 @@ class Viewer:
         self.n_frames = []
         self.frame_times = []
 
+    def load_file(self, path, pkl_idx=0, model_offset=vector(0, 0, 0), inference_path=None, is_original_data = True, is_model = False,labelText= None,denoising = False,motion_data = None):
 
-    def load_file(self, path, pkl_idx=0, model_offset=vector(0, 0, 0), inference_path=None, is_original_data = True, labelText= None,denoising = False,motion_data = None):
         if 'bvh' in path:
             with open(path) as f:
                 bvh = Bvh(f.read())
@@ -231,38 +233,31 @@ class Viewer:
             if labelText:
                 self.texts.append(text(text=labelText,pos=vector(model_offset.x, model_offset.y - 10, model_offset.z), align="center", height=10))
 
-        elif 'pkl' in path:
-
+        elif 'pkl' in path or motion_data:
             if motion_data:
                 pkl_data = motion_data
             else:
                 with open(path, 'rb') as f:
-                    pkl_data = pickle.load(f)[pkl_idx]
+                    dataset = pickle.load(f)
+                    pkl_data = dataset[pkl_idx]
 
             style = pkl_data['persona']
-            if is_original_data:
+            if is_model:
                 if 'output' in pkl_data:
                     if denoising:
-                        output = pkl_data['output'].reshape(-1, 156).transpose().copy()
-                        for i in range(0,len(output)):
-                            output[i] = savgol_filter(output[i],51,10)
-                        output = output.transpose()
-                        pkl_data['joint_rotation_matrix'] = output.reshape(-1,26,3,2)
+                        pkl_data['joint_rotation_matrix'] = motion_denosing(pkl_data['output'])
                     else:
-                        pkl_data['joint_rotation_matrix'] =  pkl_data['output']
+                        pkl_data['joint_rotation_matrix'] = pkl_data['output']
                     style = pkl_data['target_style']
-                else:
-                    self.texts.append(
-                        text(text=pkl_data['file_name'], pos=vector(model_offset.x, model_offset.y - 15, model_offset.z),
-                             align="center", height=5))
 
             else:
-                if 'target_motion' in pkl_data:
-                    pkl_data['joint_rotation_matrix'] = pkl_data['target_motion']
-                    style = pkl_data['target_style']
+                if not is_original_data:
+                    if 'target_motion' in pkl_data:
+                        pkl_data['joint_rotation_matrix'] = pkl_data['target_motion']
+                        style = pkl_data['target_style']
 
             if labelText:
-                self.texts.append(text(text=labelText+" (" + style+")",pos=vector(model_offset.x, model_offset.y - 10, model_offset.z), align="center", height=10))
+                self.texts.append(text(text=labelText+" (" + style+")",pos=vector(model_offset.x, model_offset.y - 30, model_offset.z), align="center", height=10))
 
             if inference_path is not None:
                 with open(inference_path, 'rb') as f:
@@ -297,63 +292,109 @@ class Viewer:
         self.n_frames.append(n_frames)
         self.frame_times.append(frame_time)
 
+
     def run_motion(self):
         for i in range(len(self.frame_times) - 1):
             if self.frame_times[i] != self.frame_times[i + 1]:
                 print("Warning: Frame times are not same.")
 
-        for frame_idx in range(self.max_frame_length):
+        for frame_idx in range(self.max_frame_length-100):
             for model_idx in range(len(self.models)):
-
                 if self.n_frames[model_idx] > frame_idx:
                     self.models[model_idx].update(frame_idx)
 
             time.sleep(self.frame_times[0])
 
-def view4style(path,start,end):
-    data_path = path#"C:/Users/user/Desktop/NC/git/nc_gesture/simple_rvae/datasets/data/motion_body_hand_KTG.pkl"
+def view4style(path):
+    data_path = path
     with open(data_path, 'rb') as f:
         motion_data = pickle.load(f)
+    viewer = Viewer()
 
-    for data_idx in range(start, end,4):
-        viewer = Viewer()
+    start = 0
+    end = len(motion_data)
+    for data_idx in range(start, end, 4):
         viewer.init_model()
+        cur_labels = [motion_data[data_idx+i]['persona'] for i in range(0,4)]
+        print(motion_data[data_idx]['file_name'])
         viewer.load_file("C:/Users/user/Desktop/NC/git/nc_gesture/simple_rvae/datasets/data/motion_body_hand_KTG.pkl",
                          pkl_idx=data_idx, model_offset=vector(-50, 20, 0),
-                         is_original_data=True, data=motion_data[data_idx])
+                         is_original_data=True,labelText= cur_labels[0],motion_data=motion_data[data_idx])
         viewer.load_file("C:/Users/user/Desktop/NC/git/nc_gesture/simple_rvae/datasets/data/motion_body_hand_KTG.pkl",
                          pkl_idx=data_idx + 1, model_offset=vector(50, 20, 0),
-                         is_original_data=True, data=motion_data[data_idx + 1])
+                         is_original_data=True, labelText= cur_labels[1], motion_data=motion_data[data_idx + 1])
         viewer.load_file("C:/Users/user/Desktop/NC/git/nc_gesture/simple_rvae/datasets/data/motion_body_hand_KTG.pkl",
                          pkl_idx=data_idx + 2, model_offset=vector(-50, -200, 0),
-                         is_original_data=True, data=motion_data[data_idx + 2])
+                         is_original_data=True,labelText= cur_labels[2], motion_data=motion_data[data_idx + 2])
         viewer.load_file("C:/Users/user/Desktop/NC/git/nc_gesture/simple_rvae/datasets/data/motion_body_hand_KTG.pkl",
                          pkl_idx=data_idx + 3, model_offset=vector(50, -200, 0),
-                         is_original_data=True, data=motion_data[data_idx + 3])
+                         is_original_data=True,labelText= cur_labels[3], motion_data=motion_data[data_idx + 3])
         viewer.run_motion()
+def view_result(model_result):
+    np.set_printoptions(precision=4, suppress=True)
+
+    viewer = Viewer()
+    with open(model_result, 'rb') as f:
+        data = pickle.load(f)
+
+    start = 0
+    end = len(data)
+    dis = 0
+    if "output" in data[0]:
+        dis = 75
+    if "target_motion" in data[0]:
+        dis = 100
+    for data_idx in range(start, end):
+        init_x = -dis
+        viewer.init_model()
+        viewer.load_file("",
+                         pkl_idx=data_idx, model_offset=vector(init_x, 0, 0),
+                         is_original_data=True, labelText="original", motion_data=data[data_idx].copy())
+        if "target_motion" in data[0]:
+            viewer.load_file("",
+                             pkl_idx=data_idx, model_offset=vector(init_x+dis, 0, 0),
+                             is_original_data=False,labelText="style", motion_data=data[data_idx].copy())
+        if "output" in data[0]:
+            viewer.load_file("",
+                             pkl_idx=data_idx, model_offset=vector(init_x + dis*2, 0, 0),
+                             is_original_data=True,is_model=True,denoising=True,labelText="output",motion_data=data[data_idx].copy())
+
+        viewer.run_motion()
+        time.sleep(1)
+
 def main():
     np.set_printoptions(precision=4, suppress=True)
 
     viewer = Viewer()
     viewer.init_model()
 
+    with open("data/variable_600_all.pkl", 'rb') as f:
+        motion_data = pickle.load(f)
     start = 0
-    end = 200
-    for data_idx in range(start, end, 4):
+    end = len(motion_data)
+
+    for data_idx in range(start, end,4):
         viewer.init_model()
-        #data_idx = rand.randint(start ,end)
+        data_idx = rand.randint(start ,end)
         #viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_R_12_de_01.bvh",model_offset=vector(-150,0,0))
         #viewer.load_file("C:/Users/user/Desktop/NC/HJK/VAAI_Non_R_12_di_01.bvh", model_offset=vector(150, 0, 0))
         #viewer.load_file("data/fixed_800_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0), is_original_data = True)
-        viewer.load_file("data/style_pair_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0),is_original_data=True,labelText="original")
-        viewer.load_file("data/style_pair_all.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0),is_original_data=False,labelText="styled")
-        #viewer.load_file("data/variable_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0),is_original_data=True,labelText="original")
+        #viewer.load_file("data/style_pair_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0),is_original_data=True,labelText="original")
+        #viewer.load_file("data/style_pair_all.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0),is_original_data=False,labelText="styled")
+        viewer.load_file("data/variable_600_all.pkl", pkl_idx=0, model_offset=vector(-150, 0, 0), is_original_data=True,
+                         labelText="original")
+        viewer.load_file("data/decord_result_tVAE_best_64.pkl", pkl_idx=0, model_offset=vector(0, 0, 0),
+                         is_original_data=True, labelText="output", denoising=False)
         # viewer.load_file("data/variable_all.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0),is_original_data=False,labelText="styled")
         #viewer.load_file("data/fixed_300_all.pkl", pkl_idx=data_idx, model_offset=vector(-150, 0, 0),is_original_data=True,labelText="original")
         #viewer.load_file("data/fixed_300_all.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0),is_original_data=False,labelText="styled")
-        viewer.load_file("data/decord_result_tVAE_best_128_8_sequence.pkl", pkl_idx=data_idx, model_offset=vector(150, 0, 0), is_original_data = True, labelText= "output")
-        viewer.load_file("data/decord_result_tVAE_best_128_8_sequence.pkl", pkl_idx=data_idx, model_offset=vector(300, 0, 0),
-                         is_original_data=True, labelText="output",denoising=True)
+        # viewer.load_file("data/decord_result_tVAE_best_128_8_sequence.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0), is_original_data = True, labelText= "output")
+        # viewer.load_file("data/decord_result_tVAE_best_64.pkl", pkl_idx=data_idx, model_offset=vector(0, 0, 0),
+        #                  is_original_data=True, labelText="output",denoising=False)
+        # viewer.load_file("data/decord_result_tVAE_best_64.pkl", pkl_idx=data_idx, model_offset=vector(150, 0, 0),
+        #                  is_original_data=True, labelText="output",denoising=True)
+        # viewer.load_file("data/decord_result_tVAE_best_128_8_sequence.pkl", pkl_idx=data_idx, model_offset=vector(150, 0, 0),
+        #                  is_original_data=True, labelText="output",denoising=True)
         #viewer.load_file("data/decord_result_BaseMST_style_nohand_fixed_all.pkl_10000_2.pkl", pkl_idx=data_idx, model_offset=vector(150, 0, 0), is_original_data = False)
 
         viewer.run_motion()
@@ -362,4 +403,9 @@ def main():
         time.sleep(5)
         print("End")
 
-main()
+if __name__ == "__main__":
+    #main()
+    #view4style("data/classifier_800_all.pkl")
+    #view4style("C:/Users/user/Desktop/NC/git/nc_gesture/simple_rvae/datasets/data/motion_body_hand_KTG.pkl")
+    view_result("data/decord_result_tVAE_best.pkl")
+    #view_result("data/classifier_800_all.pkl")

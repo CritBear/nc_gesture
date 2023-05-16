@@ -13,7 +13,7 @@ class Config:
     # data paths
     data_dir = pjoin(BASEPATH, 'datasets\data')
     expr_dir = BASEPATH
-    data_file_name = "fixed_200_all.pkl"
+    data_file_name = "variable_all.pkl"
 
     # model paths
     main_dir = None
@@ -39,7 +39,7 @@ class Config:
 
     triplet_margin = 1
     # Training
-    batch_size = 40 # 128
+    batch_size = 10 # 128
 
     # Testing
     test_batch_n = 56  # number of test clips

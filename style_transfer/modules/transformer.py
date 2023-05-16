@@ -27,7 +27,7 @@ class PositionalEncoding(nn.Module):
 
 
 class Encoder_TRANSFORMER(nn.Module):
-    def __init__(self, modeltype, njoints, nfeats, num_frames, num_action_classes, num_label_classes,
+    def __init__(self, modeltype, njoints, nfeats, num_frames, num_label_classes,
                  latent_dim=256, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1,
                  ablation=None, activation="gelu", **kargs):
         super().__init__()
@@ -36,7 +36,6 @@ class Encoder_TRANSFORMER(nn.Module):
         self.njoints = njoints
         self.nfeats = nfeats
         self.num_frames = num_frames
-        self.num_action_classes = num_action_classes
         self.num_label_classes = num_label_classes
 
         self.latent_dim = latent_dim
@@ -94,7 +93,7 @@ class Encoder_TRANSFORMER(nn.Module):
 
 
 class Decoder_TRANSFORMER(nn.Module):
-    def __init__(self, modeltype, njoints, nfeats, num_frames, num_action_classes,num_style_classes,
+    def __init__(self, modeltype, njoints, nfeats, num_frames,num_style_classes,
                  latent_dim=256, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1, activation="gelu",
                  ablation=None, **kargs):
         super().__init__()
