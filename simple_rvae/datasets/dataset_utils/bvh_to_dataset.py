@@ -10,8 +10,9 @@ from bvh_parser import Bvh
 class DatasetGenerator:
 
     def __init__(self, except_hand=False):
+
         self.dataset = []
-        # self.dataset[index] = {
+        # self.dataset[index] = {       # 데이터 형식
         #     'file_name': '',
         #     'n_joints': 0,
         #     'n_frames': 0,
@@ -25,11 +26,11 @@ class DatasetGenerator:
         #     'joint_rotation_matrix': None,  (n_frames x n_joints x 3 x 2)
         #     'persona': None
         # }
-        self.except_hand = except_hand
+        self.except_hand = except_hand  # 손가락 관절 제외할지 선택
 
     def reset(self):
         del self.dataset
-        gc.collect()
+        gc.collect()  # python garbage collector 비워서 메모리 확보
 
         self.dataset = []
 
@@ -68,7 +69,7 @@ class DatasetGenerator:
         elif file_name.find("_mi_") != -1:
             data['persona'] = 'mi'
         else:
-            return
+            data['persona'] = 'undefined'
 
         data['file_name'] = file_name
         data['n_frames'] = bvh.n_frames
@@ -182,22 +183,19 @@ class DatasetGenerator:
 def main():
     generator = DatasetGenerator(except_hand=False)
 
-    raw_dataset_dir_path = '..\\bvh_data'
-    refined_dataset_dir_path = '..\\data'
+    raw_dataset_dir_path = '..\\bvh_data'  # ..\\bvh_data\sub_dir\*.bvh
+    refined_dataset_dir_path = '..\\data'  # pkl 형식의 데이터셋을 저장할 디렉토리
 
     for dir in os.listdir(raw_dataset_dir_path):
-        generator.reset()
-        count = 0
+        generator.reset()  # generator에 쌓여진 bvh 파일들 비우기
 
-        sub_dir = os.path.join(raw_dataset_dir_path, dir)
+        sub_dir = os.path.join(raw_dataset_dir_path, dir)  # raw_dataset_dir_path 내부의 sub_dir
         if os.path.isdir(sub_dir):
-            for file_name in [f for f in os.listdir(sub_dir) if f.endswith(".bvh")]:
+            for file_name in [f for f in os.listdir(sub_dir) if f.endswith(".bvh")]:  # bvh 파일만 가져오기
                 generator.read(sub_dir, file_name)
                 print(f'complete. {file_name}')
-                # count += 1
-                # if count > 2:
-                #     break
 
+        # sub_dir 에 있는 bvh 파일들을 하나의 dataset으로 묶어서 저장
         generator.save(refined_dataset_dir_path, f'motion_body_hand_{dir}')
 
 
