@@ -21,13 +21,13 @@ def get_onehot_labels(styles):
     return labels
 
 def to_index(style):
-    if style == "de":
+    if style == "de" or style == "light":
         return 0#[1,0,0,0]
-    elif style == "di":
+    elif style == "di" or style == "heavy":
         return 1#[0,1,0,0]
-    elif style == "me":
+    elif style == "me" or style == "slow":
         return 2#[0,0,1,0]
-    elif style == "mi":
+    elif style == "mi" or style == "fast":
         return 3#[0,0,0,1]
     else:
         raise ValueError

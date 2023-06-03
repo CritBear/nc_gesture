@@ -59,12 +59,9 @@ def make_style_dataset(dataset_name):
 
 
 
-def make_pairs(data_path,max_length,fixed_length):
+def make_pairs(data,max_length,fixed_length):
 
-    with open(data_path, 'rb') as f:
-        data = pickle.load(f)
-
-    arr = ['de','di','me','mi']
+    arr = ['light','heavy','slow','fast']#['de','di','me','mi']
     styleCombo = list(itertools.combinations(arr,2))
 
     action_style_dict = {}
@@ -97,7 +94,7 @@ def make_pairs(data_path,max_length,fixed_length):
                 for i in range(0,l //fixed_length):
                     s = max((int)(i * fixed_length - fixed_length * 0.1), 0)
                     e = s + fixed_length
-                    if (e >= l): break
+                    if (e >= l - 100): break
                     cur = action_style_dict[action][pair[0]].copy()
                     cur['n_frames'] = fixed_length
                     cur['joint_rotation_matrix'] = action_style_dict[action][pair[0]]['joint_rotation_matrix'][s:e]
@@ -106,14 +103,13 @@ def make_pairs(data_path,max_length,fixed_length):
                     pairdataset.append(cur.copy())
     return pairdataset
 
-def refine():
-    pairdataset = make_pairs("../../simple_rvae/datasets/data/motion_body_HJK.pkl",800,200)
-    pairdataset += make_pairs("../../simple_rvae/datasets/data/motion_body_KTG.pkl",800,200)
-    with open('data/style_pair_all.pkl', 'wb') as f:
-        pickle.dump(pairdataset,f)
+def refine(data):
+    pairdataset = make_pairs(data,800,400)
+
+    # with open('data/style_pair_400_all.pkl', 'wb') as f:
+    #     pickle.dump(pairdataset,f)
 
 def for_fixed_recon(data,max_length,fixed_length):
-
     dataset = []
     for d in data:
         l =  d['n_frames']
@@ -142,7 +138,13 @@ def for_variable_recon(data,max_length):
             cur['target_motion'] = d['joint_rotation_matrix']
             cur['target_style'] = cur['persona']
             dataset.append(cur)
-    with open('data/variable_600_all.pkl', 'wb') as f:
+        else:
+            cur = d.copy()
+            cur['n_frames'] = max_length
+            cur['target_motion'] = d['joint_rotation_matrix'][:max_length]
+            cur['target_style'] = cur['persona']
+            dataset.append(cur)
+    with open(f'data/lhsf_{max_length}_all.pkl', 'wb') as f:
         pickle.dump(dataset,f)
 
 def for_classifier(data,max_length):
@@ -170,14 +172,42 @@ def for_classifier(data,max_length):
     with open(f'data/classifier_{max_length}_high.pkl', 'wb') as f:
         pickle.dump(dataset,f)
 
+def make_style_pair(data,fixed_length):
+    dataset = []
+    for d in data:
+        l =  d['n_frames']
+        if l > fixed_length:
+            cur = d.copy()
+            target = random.choice(data).copy()
+            while True:
+                if target['n_frames'] > fixed_length and target['persona'] != d['persona']:
+                    break
+                else:
+                    target = random.choice(data).copy()
+            cur['n_frames'] = fixed_length
+            cur['joint_rotation_matrix'] = d['joint_rotation_matrix'][:fixed_length]
+            cur['target_motion'] = target['joint_rotation_matrix'][:fixed_length]
+            cur['target_style'] = target['persona']
+            dataset.append(cur)
+            #print(cur['persona'],target['persona'])
+        else:
+            print(d['file_name'])
+    #print(len(dataset))
+    with open(f'data/lhsf_{fixed_length}_fixed_all.pkl', 'wb') as f:
+        pickle.dump(dataset,f)
+
+
 if __name__ == '__main__':
-    with open("../../simple_rvae/datasets/data/motion_body_HJK.pkl", 'rb') as f:
+    f1 = "../../simple_rvae/datasets/data/motion_body_hand_light_heavy.pkl"
+    f2 = "../../simple_rvae/datasets/data/motion_body_hand_slow_fast.pkl"
+    with open(f1, 'rb') as f:
         d1 = pickle.load(f)
-    with open("../../simple_rvae/datasets/data/motion_body_KTG.pkl", 'rb') as f:
+    with open(f2, 'rb') as f:
         d2 = pickle.load(f)
     #for_fixed_recon(d1+d2,800,300)
-    #for_variable_recon(d1+d2,600)
-    for_classifier(d1+d2,900)
+    #for_variable_recon(d1+d2,800)
+    #for_classifier(d1+d2,900)
+    make_style_pair(d1+d2,300)
     #refine()
     #refine("../../simple_rvae/datasets/data/motion_body_KTG.pkl")
 

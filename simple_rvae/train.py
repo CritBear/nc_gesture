@@ -268,6 +268,9 @@ def split_data(data,origin_data, fixed_size):
                 #print(d["n_frames"], i, "size:", len(dd['joint_rotation_matrix']))
                 data.append(dd)
     print("600 보다 작은 데이터 수 ",n)
+
+
+
 def make_short_data():
     data_path1 = 'datasets/data/motion_body_HJK.pkl'
     data_path2 = 'datasets/data/motion_body_KTG.pkl'
@@ -295,9 +298,12 @@ def make_short_data():
          pickle.dump(data, f)
 
 if __name__ == "__main__":
+    with open("datasets/data/motion_body_slow_fast.pkl", 'rb') as f:
+        data1 = pickle.load(f)
+    print(len(data1))
     #make_short_data()
     #train()
-    make_short_data()
+    #make_short_data()
     #make_result_data("motion_body_fixed_HJKKTG.pkl","rvae__0414.pt")
     #extract_latent_space("motion_body_fixed_HJKKTG.pkl","rvae__0414.pt")
     #extract_latent_from_data()

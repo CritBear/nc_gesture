@@ -87,6 +87,7 @@ class Encoder_TRANSFORMER(nn.Module):
 
         cls = final[0]
 
+        batch['cls'] = cls
         batch['output'] = self.finalLayer(cls)
 
         return batch

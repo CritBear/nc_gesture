@@ -68,7 +68,8 @@ class DatasetGenerator:
         elif file_name.find("_mi_") != -1:
             data['persona'] = 'mi'
         else:
-            return
+            s = file_name.split("_")
+            data['persona'] = s[4]
 
         data['file_name'] = file_name
         data['n_frames'] = bvh.n_frames

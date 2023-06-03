@@ -243,12 +243,14 @@ class Viewer:
 
             style = pkl_data['persona']
             if is_model:
-                if 'output' in pkl_data:
+                if labelText in pkl_data:
                     if denoising:
-                        pkl_data['joint_rotation_matrix'] = motion_denosing(pkl_data['output'])
+                        pkl_data['joint_rotation_matrix'] = motion_denosing(pkl_data[labelText],joint_num=len(pkl_data['joint_rotation_matrix'][0]))
                     else:
                         pkl_data['joint_rotation_matrix'] = pkl_data['output']
                     style = pkl_data['target_style']
+                    if labelText == "output2":
+                        style = pkl_data['target_style2']
 
             else:
                 if not is_original_data:
@@ -257,7 +259,8 @@ class Viewer:
                         style = pkl_data['target_style']
 
             if labelText:
-                self.texts.append(text(text=labelText+" (" + style+")",pos=vector(model_offset.x, model_offset.y - 30, model_offset.z), align="center", height=10))
+
+                self.texts.append(text(text=f'{labelText} ({style})',pos=vector(model_offset.x, model_offset.y - 30, model_offset.z), align="center", height=10))
 
             if inference_path is not None:
                 with open(inference_path, 'rb') as f:
@@ -300,7 +303,7 @@ class Viewer:
 
         for frame_idx in range(self.max_frame_length-100):
             for model_idx in range(len(self.models)):
-                if self.n_frames[model_idx] > frame_idx:
+                if min(self.n_frames[model_idx],800)> frame_idx:
                     self.models[model_idx].update(frame_idx)
 
             time.sleep(self.frame_times[0])
@@ -358,6 +361,10 @@ def view_result(model_result):
             viewer.load_file("",
                              pkl_idx=data_idx, model_offset=vector(init_x + dis*2, 0, 0),
                              is_original_data=True,is_model=True,denoising=True,labelText="output",motion_data=data[data_idx].copy())
+        if "output2" in data[0]:
+            viewer.load_file("",
+                             pkl_idx=data_idx, model_offset=vector(init_x + dis*3, 0, 0),
+                             is_original_data=True,is_model=True,denoising=False,labelText="output2",motion_data=data[data_idx].copy())
 
         viewer.run_motion()
         time.sleep(1)
@@ -407,5 +414,6 @@ if __name__ == "__main__":
     #main()
     #view4style("data/classifier_800_all.pkl")
     #view4style("C:/Users/user/Desktop/NC/git/nc_gesture/simple_rvae/datasets/data/motion_body_hand_KTG.pkl")
-    view_result("data/decord_result_tVAE_best.pkl")
+    #view_result("data/decord_result_tVAE_best.pkl")
+    view_result("data/lhsf_300_fixed_all.pkl")
     #view_result("data/classifier_800_all.pkl")

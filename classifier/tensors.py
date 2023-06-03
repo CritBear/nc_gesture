@@ -3,16 +3,26 @@ import torch
 
 
 def to_index(style):
-    if style == "de":
-        return 0#[1,0,0,0]
-    elif style == "di":
-        return 1#[0,1,0,0]
-    elif style == "me":
-        return 2#[0,0,1,0]
-    elif style == "mi":
-        return 3#[0,0,0,1]
+    if style == "light":
+        return 0
+    elif style == "heavy":
+        return 1
+    elif style == "slow":
+        return 2
+    elif style == "fast":
+        return 3
     else:
         raise ValueError
+    # if style == "de":
+    #     return 0
+    # elif style == "di":
+    #     return 1
+    # elif style == "me":
+    #     return 2
+    # elif style == "mi":
+    #     return 3
+    # else:
+    #     raise ValueError
 
 def lengths_to_mask(lengths):
     max_len = max(lengths)

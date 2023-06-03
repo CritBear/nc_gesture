@@ -13,7 +13,7 @@ class Config:
     # data paths
     data_dir = pjoin(BASEPATH, 'datasets\data')
     expr_dir = BASEPATH
-    data_file_name = "variable_all.pkl"
+    data_file_name = "lhsf_800_all.pkl"
 
     # model paths
     main_dir = None
@@ -30,7 +30,7 @@ class Config:
     mt_batch_n = 1  # number of batches to save in training
 
     # optimization options
-    num_epochs = 100000              # maximum number of training iterations
+    num_epochs = 2000              # maximum number of training iterations
     weight_decay = 0.0001          # weight decay
     lr_gen = 0.0001 #0.0001                # learning rate for the generator
     lr_dis = 0.0001                # learning rate for the discriminator
@@ -39,7 +39,7 @@ class Config:
 
     triplet_margin = 1
     # Training
-    batch_size = 10 # 128
+    batch_size = 2 # 128
 
     # Testing
     test_batch_n = 56  # number of test clips
@@ -63,7 +63,7 @@ class Config:
     pos3d_channels = 100  # 64
 
     num_channel = rot_channels
-    num_joints = 26  # 21
+    num_joints = 74  # 21
 
     style_channel_3d = pos3d_channels
 

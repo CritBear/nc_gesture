@@ -270,7 +270,13 @@ def result_tvae(model_name):
 
     with open(f"datasets/data/decord_result_{model_name}.pkl", 'wb') as f:
         pickle.dump(result, f)
+def create_random_tensor_excluding(n, exclude_value):
+    random_tensor = torch.randint(low=0, high=4, size=(n,))
+    for i in range(n):
+        if random_tensor[i] == exclude_value[i]:
+            random_tensor[i] = (exclude_value[i]+1)%4
 
+    return random_tensor
 def result_tvae_decode(model_name):
     options = Config()
     options.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -296,12 +302,18 @@ def result_tvae_decode(model_name):
             batch = {key: val.to(options.device) for key, val in batch.items()}
             batch['z'] = torch.randn(batch['x'].shape[0],options.latent_dim, device=options.device)
             batch = model.decode(batch)
+            batch2 = batch.copy()
+            batch2['style'] = create_random_tensor_excluding(len(batch['x']),batch['style'].cpu())
+            batch2 = model.decode(batch2)
             for i,m in enumerate(batch['output']):
                 origin_data = origin_dataset[idx * model.config.batch_size + i]
                 d = origin_data.copy()
-                d["output"] = m.reshape(-1,26, 3, 2).cpu().numpy()
+                d["output"] = m.reshape(-1, 26, 3, 2).cpu().numpy()
+                d["output2"] = batch2['output'][i].reshape(-1, 26,3, 2).cpu().numpy()
+                d['target_style2'] = batch2['style'][i]
                 #d['target_motion'] = batch['x'][i].reshape(len(batch['x'][i]),26,3,2).cpu().numpy()
-                d['target_style'] = origin_data['target_style']
+                d['target_style'] = batch['style'][i]
+
                 result.append(d)
 
     with open(f"datasets/data/decord_result_{model_name}.pkl", 'wb') as f:
@@ -341,7 +353,7 @@ def result_tvae(model_name):
                 if first_false_indices.numel() > 0:
                     first_false_index = first_false_indices.min().item()
                     d['n_frames'] = first_false_index
-                d["output"] = outmasked.reshape(-1, 26, 3, 2).cpu().numpy()
+                d["output"] = outmasked.reshape(-1, options.num_joints, 3, 2).cpu().numpy()
                 #d['target_motion'] = batch['x'][i].reshape(len(batch['x'][i]),26,3,2).cpu().numpy()
                 d['target_style'] = origin_data['target_style']
                 result.append(d)

@@ -5,8 +5,6 @@ import numpy as np
 from torch.utils.data import DataLoader
 
 
-
-
 from nc_gesture.simple_rvae.datasets.nc_mocap import NCMocapDataset
 from modules.networks import Generator
 
@@ -23,8 +21,9 @@ import random
 from utils.utils import *
 from utils.tensors import *
 from datasets.ActionStyleDataset import *
-from modules.transformer_vae import *
+#from modules.transformer_vae import *
 from sklearn.model_selection import train_test_split
+from modules.transformer_vae import *
 
 def recon_criterion(predict, target):
     return torch.mean(torch.abs(predict - target))
@@ -70,7 +69,6 @@ def train():
     # train_size = int(0.8 * len(dataset))
     # test_size = len(dataset) - train_size
     # train_content_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
-
 
     train_content_dataloader = DataLoader(dataset, batch_size=options.batch_size, shuffle=False)
 
@@ -150,10 +148,10 @@ def train():
 
 def getLoss(batch):
     MSELoss = torch.nn.MSELoss()
-    beta = 0
-    recon_loss,test_loss, vel_loss = compute_mse_loss(batch) ,MSELoss(batch['output'],batch['x']),compute_vel_mse_loss(batch)#, kl_divergence(batch["mu"], batch["logvar"])
-    loss = (1 - beta) * (recon_loss)
-    lossdict = {"recon Loss":recon_loss,"vel_loss":vel_loss,"test_loss":test_loss} #,"kl_loss":kl_loss
+    beta = 0.0005
+    recon_loss,vel_loss,avg_vel_loss,kl_loss = compute_mse_loss(batch),compute_vel_mse_loss(batch),compute_avg_vel_mse_loss(batch),kl_divergence(batch["mu"], batch["logvar"])
+    loss = (1 - beta) * (recon_loss + 10 * vel_loss) + beta * kl_loss#+ 5*compute_vel_mse_loss(batch)
+    lossdict = {"recon Loss":recon_loss,"vel_loss":vel_loss,'avg_vel_loss':avg_vel_loss,"kl_loss":kl_loss} #,"kl_loss":kl_loss
     return loss,lossdict
 
 def train_tvae():
@@ -170,7 +168,7 @@ def train_tvae():
     writer = SummaryWriter('logs/')
 
     model = TVAE(options).to(options.device)
-    model.load_state_dict(torch.load('Result/tVAE_best.pt'))
+    #model.load_state_dict(torch.load('Result/tVAE_best.pt'))
     optimizer = torch.optim.AdamW(model.parameters(), lr=options.lr_gen)
 
 
